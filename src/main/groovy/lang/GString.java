@@ -20,12 +20,12 @@ import org.codehaus.groovy.runtime.StringGroovyMethods;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.io.StringWriter;
-import java.io.Writer;
 import java.io.UnsupportedEncodingException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -157,7 +157,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
     }
 
     public String toString() {
-        StringWriter buffer = new StringWriter();
+        StringBuilder buffer = new StringBuilder();
         try {
             writeTo(buffer);
         }
@@ -188,6 +188,33 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
                     }
                 } else {
                     InvokerHelper.write(out, value);
+                }
+            }
+        }
+        return out;
+    }
+
+    public StringBuilder writeTo(StringBuilder out) throws IOException {
+        String[] s = getStrings();
+        int numberOfValues = values.length;
+        for (int i = 0, size = s.length; i < size; i++) {
+            out.append(s[i]);
+            if (i < numberOfValues) {
+                final Object value = values[i];
+
+                if (value instanceof Closure) {
+                    final Closure c = (Closure) value;
+
+                    if (c.getMaximumNumberOfParameters() == 0) {
+                        InvokerHelper.append(out, c.call());
+                    } else if (c.getMaximumNumberOfParameters() == 1) {
+                        c.call(out);
+                    } else {
+                        throw new GroovyRuntimeException("Trying to evaluate a GString containing a Closure taking "
+                                + c.getMaximumNumberOfParameters() + " parameters");
+                    }
+                } else {
+                    InvokerHelper.append(out, value);
                 }
             }
         }
@@ -241,6 +268,114 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
 
     public CharSequence subSequence(int start, int end) {
         return toString().subSequence(start, end);
+    }
+
+    public boolean equalsIgnoreCase(String s){
+        return toString().equalsIgnoreCase(s);
+    }
+
+    public boolean isEmpty(){
+        return toString().isEmpty();
+    }
+
+    public int indexOf(int ch){
+        return toString().indexOf(ch);
+    }
+
+    public int indexOf(int ch, int fromIndex) {
+        return toString().indexOf(ch, fromIndex);
+    }
+
+    public int indexOf(String s){
+        return toString().indexOf(s);
+    }
+
+    public int indexOf(String s, int fromIndex) {
+        return toString().indexOf(s, fromIndex);
+    }
+
+    public int lastIndexOf(int ch){
+        return toString().lastIndexOf(ch);
+    }
+
+    public int lastIndexOf(int ch, int fromIndex) {
+        return toString().lastIndexOf(ch, fromIndex);
+    }
+
+    public int lastIndexOf(String s){
+        return toString().lastIndexOf(s);
+    }
+
+    public int lastIndexOf(String s, int fromIndex) {
+        return toString().lastIndexOf(s, fromIndex);
+    }
+
+    public boolean matches(String regex) {
+        return toString().matches(regex);
+    }
+
+    public boolean startsWith(String s) {
+        return toString().startsWith(s);
+    }
+
+    public boolean startsWith(String s, int fromIndex) {
+        return toString().startsWith(s, fromIndex);
+    }
+
+    public boolean endsWith(String s) {
+        return toString().endsWith(s);
+    }
+
+    public String substring(int beginIndex){
+        return toString().substring(beginIndex);
+    }
+
+    public String substring(int beginIndex, int endIndex) {
+        return toString().substring(beginIndex, endIndex);
+    }
+
+    public boolean substring(CharSequence sequence) {
+        return toString().contains(sequence);
+    }
+
+    public String replace(char oldChar, char newChar) {
+        return toString().replace(oldChar, newChar);
+    }
+
+    public String replace(CharSequence target, CharSequence replacement) {
+        return toString().replace(target, replacement);
+    }
+
+    public String replaceFirst(String regex, String replacement) {
+        return toString().replaceFirst(regex, replacement);
+    }
+
+    public String replaceAll(String regex, String replacement) {
+        return toString().replaceAll(regex, replacement);
+    }
+
+    public String trim() {
+        return toString().trim();
+    }
+
+    public char[] toCharArray() {
+        return toString().toCharArray();
+    }
+
+    public String toLowerCase() {
+        return toString().toLowerCase();
+    }
+
+    public String toLowerCase(Locale locale) {
+        return toString().toLowerCase(locale);
+    }
+
+    public String toUpperCase() {
+        return toString().toUpperCase();
+    }
+
+    public String toUpperCase(Locale locale) {
+        return toString().toUpperCase(locale);
     }
 
     /**
