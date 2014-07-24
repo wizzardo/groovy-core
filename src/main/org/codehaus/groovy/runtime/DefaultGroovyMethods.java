@@ -60,6 +60,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -156,6 +157,29 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
 //            SwingGroovyMethods.class,
 //            XmlGroovyMethods.class
     };
+
+    private static ConcurrentHashMap<Class ,FieldSetter> staticMetaclassFields = new ConcurrentHashMap<Class, FieldSetter>();
+
+    private static class FieldSetter {
+        private Field field;
+
+        private FieldSetter(Class c, String fieldName) {
+            try {
+                field = c.getDeclaredField(fieldName);
+            } catch (Throwable e) {
+                //DO NOTHING
+            }
+        }
+
+        public void set(Object instance, Object value) {
+            if (field != null)
+                try {
+                    field.set(instance, value);
+                } catch (Throwable e) {
+                    //DO NOTHING
+                }
+        }
+    }
 
     /**
      * Identity check. Since == is overridden in Groovy with the meaning of equality
@@ -11960,14 +11984,13 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     private static void disablePrimitiveOptimization(Object self) {
-        Field sdyn;
         Class c = self.getClass();
-        try {
-            sdyn = c.getDeclaredField(Verifier.STATIC_METACLASS_BOOL);
-            sdyn.setBoolean(null, true);
-        } catch (Throwable e) {
-            //DO NOTHING
+        FieldSetter fieldSetter = staticMetaclassFields.get(c);
+        if (fieldSetter == null) {
+            fieldSetter = new FieldSetter(c, Verifier.STATIC_METACLASS_BOOL);
+            staticMetaclassFields.putIfAbsent(c, fieldSetter);
         }
+        fieldSetter.set(null, true);
     }
 
     /**
