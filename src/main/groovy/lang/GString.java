@@ -48,8 +48,10 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
      * A GString containing a single empty String and no values.
      */
     public static final GString EMPTY = new GString(new Object[0]) {
+        String[] arr = new String[]{""};
+
         public String[] getStrings() {
-            return new String[]{""};
+            return arr;
         }
     };
 
@@ -157,7 +159,10 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
     }
 
     public String toString() {
-        StringBuilder buffer = new StringBuilder();
+        if (values.length == 0)
+            return getStrings()[0];
+
+        StringBuilder buffer = new StringBuilder(countLength());
         try {
             writeTo(buffer);
         }
@@ -165,6 +170,14 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
             throw new StringWriterIOException(e);
         }
         return buffer.toString();
+    }
+
+    private int countLength() {
+        int l = 0;
+        for (String s : getStrings())
+            l += s.length();
+
+        return l * 2;
     }
 
     public Writer writeTo(Writer out) throws IOException {
