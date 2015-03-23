@@ -22,10 +22,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.lang.ref.SoftReference;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Pattern;
 
 /**
@@ -43,6 +42,8 @@ import java.util.regex.Pattern;
 public abstract class GString extends GroovyObjectSupport implements Comparable, CharSequence, Writable, Buildable, Serializable {
 
     static final long serialVersionUID = -2638020355892246323L;
+
+    private static Queue<SoftReference<StringBuilder>> stringBuilders = new ConcurrentLinkedQueue<SoftReference<StringBuilder>>();
 
     /**
      * A GString containing a single empty String and no values.
@@ -77,8 +78,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
     public Object invokeMethod(String name, Object args) {
         try {
             return super.invokeMethod(name, args);
-        }
-        catch (MissingMethodException e) {
+        } catch (MissingMethodException e) {
             // lets try invoke the method on the real String
             return InvokerHelper.invokeMethod(toString(), name, args);
         }
@@ -162,14 +162,30 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         if (values.length == 0)
             return getStrings()[0];
 
-        StringBuilder buffer = new StringBuilder(countLength());
+        StringBuilder sb = null;
+        SoftReference<StringBuilder> reference = null;
+        while (sb == null) {
+            reference = stringBuilders.poll();
+            if (reference == null) {
+                sb = new StringBuilder(countLength());
+                break;
+            }
+
+            sb = reference.get();
+        }
+        String result;
         try {
-            writeTo(buffer);
-        }
-        catch (IOException e) {
+            writeTo(sb);
+            result = sb.toString();
+        } catch (IOException e) {
             throw new StringWriterIOException(e);
+        } finally {
+            sb.setLength(0);
+            if (reference == null)
+                reference = new SoftReference<StringBuilder>(sb);
+            stringBuilders.add(reference);
         }
-        return buffer.toString();
+        return result;
     }
 
     private int countLength() {
@@ -283,15 +299,15 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return toString().subSequence(start, end);
     }
 
-    public boolean equalsIgnoreCase(String s){
+    public boolean equalsIgnoreCase(String s) {
         return toString().equalsIgnoreCase(s);
     }
 
-    public boolean isEmpty(){
+    public boolean isEmpty() {
         return toString().isEmpty();
     }
 
-    public int indexOf(int ch){
+    public int indexOf(int ch) {
         return toString().indexOf(ch);
     }
 
@@ -299,7 +315,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return toString().indexOf(ch, fromIndex);
     }
 
-    public int indexOf(String s){
+    public int indexOf(String s) {
         return toString().indexOf(s);
     }
 
@@ -307,7 +323,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return toString().indexOf(s, fromIndex);
     }
 
-    public int lastIndexOf(int ch){
+    public int lastIndexOf(int ch) {
         return toString().lastIndexOf(ch);
     }
 
@@ -315,7 +331,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return toString().lastIndexOf(ch, fromIndex);
     }
 
-    public int lastIndexOf(String s){
+    public int lastIndexOf(String s) {
         return toString().lastIndexOf(s);
     }
 
@@ -339,7 +355,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return toString().endsWith(s);
     }
 
-    public String substring(int beginIndex){
+    public String substring(int beginIndex) {
         return toString().substring(beginIndex);
     }
 
@@ -405,6 +421,6 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
     }
 
     public byte[] getBytes(String charset) throws UnsupportedEncodingException {
-       return toString().getBytes(charset);
+        return toString().getBytes(charset);
     }
 }
