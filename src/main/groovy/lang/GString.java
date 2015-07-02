@@ -15,6 +15,10 @@
  */
 package groovy.lang;
 
+import groovy.wizzardo.ExceptionDrivenStringBuilder;
+import groovy.wizzardo.pool.Holder;
+import groovy.wizzardo.pool.Pool;
+import groovy.wizzardo.pool.PoolBuilder;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
 
@@ -43,7 +47,20 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
 
     static final long serialVersionUID = -2638020355892246323L;
 
-    private static Queue<SoftReference<StringBuilder>> stringBuilders = new ConcurrentLinkedQueue<SoftReference<StringBuilder>>();
+    private static final Pool<ExceptionDrivenStringBuilder> stringBuilders = new PoolBuilder<ExceptionDrivenStringBuilder>()
+            .supplier(new PoolBuilder.Supplier<ExceptionDrivenStringBuilder>() {
+                @Override
+                public ExceptionDrivenStringBuilder get() {
+                    return new ExceptionDrivenStringBuilder();
+                }
+            })
+            .resetter(new PoolBuilder.Resetter<ExceptionDrivenStringBuilder>() {
+                @Override
+                public void reset(ExceptionDrivenStringBuilder exceptionDrivenStringBuilder) {
+                    exceptionDrivenStringBuilder.setLength(0);
+                }
+            })
+            .build();
 
     /**
      * A GString containing a single empty String and no values.
@@ -162,38 +179,17 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         if (values.length == 0)
             return getStrings()[0];
 
-        StringBuilder sb = null;
-        SoftReference<StringBuilder> reference = null;
-        while (sb == null) {
-            reference = stringBuilders.poll();
-            if (reference == null) {
-                sb = new StringBuilder(countLength());
-                break;
-            }
-
-            sb = reference.get();
-        }
-        String result;
+        Holder<ExceptionDrivenStringBuilder> holder;
+        holder = stringBuilders.holder();
         try {
+            ExceptionDrivenStringBuilder sb = holder.get();
             writeTo(sb);
-            result = sb.toString();
+            return sb.toString();
         } catch (IOException e) {
             throw new StringWriterIOException(e);
         } finally {
-            sb.setLength(0);
-            if (reference == null)
-                reference = new SoftReference<StringBuilder>(sb);
-            stringBuilders.add(reference);
+            holder.close();
         }
-        return result;
-    }
-
-    private int countLength() {
-        int l = 0;
-        for (String s : getStrings())
-            l += s.length();
-
-        return l * 2;
     }
 
     public Writer writeTo(Writer out) throws IOException {
@@ -223,7 +219,7 @@ public abstract class GString extends GroovyObjectSupport implements Comparable,
         return out;
     }
 
-    public StringBuilder writeTo(StringBuilder out) throws IOException {
+    public ExceptionDrivenStringBuilder writeTo(ExceptionDrivenStringBuilder out) throws IOException {
         String[] s = getStrings();
         int numberOfValues = values.length;
         for (int i = 0, size = s.length; i < size; i++) {
