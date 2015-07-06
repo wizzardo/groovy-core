@@ -15,13 +15,15 @@
  */
 package org.codehaus.groovy.tools;
 
+import groovy.wizzardo.Unchecked;
+import groovy.wizzardo.cache.Cache;
+import groovy.wizzardo.cache.Computable;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * This ClassLoader should be used as root of class loaders. Any
@@ -73,6 +75,55 @@ import java.util.Map;
 public class RootLoader extends URLClassLoader {
 
     private Map<String, Class> customClasses = new HashMap<String, Class>();
+    private Cache<String, URL> resourceUrls = new Cache<String, URL>(60, new Computable<String, URL>() {
+        @Override
+        public URL compute(String name) {
+            URL url = findResource(name);
+            if (url == null) url = RootLoader.super.getResource(name);
+            return url;
+        }
+    });
+    private Cache<ClassCacheKey, Class> oldFindClass = new Cache<ClassCacheKey, Class>(60, new Computable<ClassCacheKey, Class>() {
+        @Override
+        public Class compute(ClassCacheKey key) {
+            try {
+                return oldFindClass(key.name);
+            } catch (ClassNotFoundException ignored) {
+            }
+
+            try {
+                return RootLoader.super.loadClass(key.name, key.resolve);
+            } catch (ClassNotFoundException e) {
+                throw Unchecked.rethrow(e);
+            }
+        }
+    }).setRemoveOnException(true);
+
+    private static class ClassCacheKey {
+        final String name;
+        final boolean resolve;
+
+        private ClassCacheKey(String name, boolean resolve) {
+            this.name = name;
+            this.resolve = resolve;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+
+            ClassCacheKey that = (ClassCacheKey) o;
+
+            return name.equals(that.name);
+
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
+    }
 
     /**
      * constructs a new RootLoader without classpath
@@ -139,12 +190,7 @@ public class RootLoader extends URLClassLoader {
         c = (Class) customClasses.get(name);
         if (c != null) return c;
 
-        try {
-            c = oldFindClass(name);
-        } catch (ClassNotFoundException cnfe) {
-            // IGNORE
-        }
-        if (c == null) c = super.loadClass(name, resolve);
+        c = oldFindClass.get(new ClassCacheKey(name, resolve));
 
         if (resolve) resolveClass(c);
 
@@ -155,9 +201,7 @@ public class RootLoader extends URLClassLoader {
      * returns the URL of a resource, or null if it is not found
      */
     public URL getResource(String name) {
-        URL url = findResource(name);
-        if (url == null) url = super.getResource(name);
-        return url;
+        return resourceUrls.get(name);
     }
 
     /**
