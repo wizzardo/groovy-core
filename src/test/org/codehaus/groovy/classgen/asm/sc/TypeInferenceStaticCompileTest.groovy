@@ -91,16 +91,5 @@ class TypeInferenceStaticCompileTest extends TypeInferenceSTCTest implements Sta
             assert Ann2.isAssignableFrom (doit(new A(), "field").class)
             '''
     }
-
-    // GROOVY-5655
-    void testByteArrayInference() {
-        assertScript '''
-                @ASTTest(phase=INSTRUCTION_SELECTION, value={
-                    assert node.getNodeMetaData(INFERRED_TYPE) == byte_TYPE.makeArray()
-                })
-                def b = "foo".bytes
-                new String(b)
-            '''
-    }
 }
 

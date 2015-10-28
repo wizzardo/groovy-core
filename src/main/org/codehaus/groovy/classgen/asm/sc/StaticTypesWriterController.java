@@ -115,10 +115,6 @@ public class StaticTypesWriterController extends DelegatingController {
         return super.getCallSiteWriter();
     }
 
-    public CallSiteWriter getRegularCallSiteWriter() {
-        return super.getCallSiteWriter();
-    }
-
     @Override
     public StatementWriter getStatementWriter() {
         if (isInStaticallyCheckedMethod) {
