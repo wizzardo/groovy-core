@@ -1,19 +1,21 @@
-/*
- * Copyright 2008 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.beans;
 
 import org.codehaus.groovy.transform.GroovyASTTransformationClass;
@@ -28,18 +30,18 @@ import java.lang.annotation.Target;
  *
  * When annotating a property it indicates that the property should be a
  * bound property according to the JavaBeans spec, announcing to listeners
- * that the value has changed. <br/><br/>
- *
+ * that the value has changed.
+ * <p>
  * When annotating a class it indicates that all groovy properties in that
  * class should be bound as though each property had the annotation (even
- * if it already has it explicitly).<br/><br/>
- *
+ * if it already has it explicitly).
+ * <p>
  * It is a compilation error to place this annotation on a field (that is
- * not a property, i.e. has scope visibility modifiers).<br/><br/>
- *
+ * not a property, i.e. has scope visibility modifiers).
+ * <p>
  * If a property with a user defined setter method is annotated the code
- * block is wrapped with the needed code to fire off the event.<br/><br/>
- *
+ * block is wrapped with the needed code to fire off the event.
+ * <p>
  * The following example shows how you can use this annotation on fields
  * of a class: 
  * <pre>
@@ -55,7 +57,6 @@ import java.lang.annotation.Target;
  * Notice the difference between a String property and a def/Object property: 
  * <pre>
  * public class Person { 
- * 
  *     &#064;groovy.beans.Bindable
  *     private java.lang.String firstName 
  *     &#064;groovy.beans.Bindable
@@ -103,6 +104,7 @@ import java.lang.annotation.Target;
  *     }
  * }
  * </pre>
+ *
  * @see BindableASTTransformation
  * @author Danno Ferrin (shemnon)
  */

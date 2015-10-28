@@ -1,17 +1,20 @@
-/*
- * Copyright 2008-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.lang;
 
@@ -24,11 +27,11 @@ import java.lang.annotation.Target;
 
 /**
  * Field annotation to automatically delegate part of the functionality of an owner class to the annotated field.
- * <p/>
+ * <p>
  * All public instance methods present in the type of the annotated field and not present in the owner class
  * will be added to owner class at compile time. The implementation of such automatically added
  * methods is code which calls through to the delegate as per the normal delegate pattern.
- * <p/>
+ * <p>
  * As an example, consider this code:
  * <pre>
  * class Event {
@@ -82,13 +85,13 @@ import java.lang.annotation.Target;
  * made to the first defined field having that signature. If this does occur,
  * it might be regarded as a smell (or at least poor style) and it might be
  * clearer to do the delegation by long hand.
- * <p/>
+ * <p>
  * By default, methods of the delegate type marked as {@code @Deprecated} are
  * not automatically added to the owner class (but see the technical note
  * about interfaces below). You can force these methods to
  * be added by setting the annotation's {@code deprecated} element to true,
  * i.e. {@code @Delegate(deprecated = true)}.
- * <p/>
+ * <p>
  * For example, in the example above if we change the delegate definition to:
  * <pre>
  *     {@code @Delegate}(deprecated = true) Date when
@@ -123,7 +126,7 @@ import java.lang.annotation.Target;
  * @author Paul King
  */
 @java.lang.annotation.Documented
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})
 @GroovyASTTransformationClass("org.codehaus.groovy.transform.DelegateASTTransformation")
 public @interface Delegate {
@@ -140,4 +143,61 @@ public @interface Delegate {
      * @return true if owner class should delegate to methods annotated with @Deprecated
      */
     boolean deprecated() default false;
+
+    /**
+     * Whether to carry over annotations from the methods of the delegate
+     * to your delegating method. Currently Closure annotation members are
+     * not supported.
+     *
+     * @return true if generated delegate methods should keep method annotations
+     */
+    boolean methodAnnotations() default false;
+
+    /**
+     * Whether to carry over annotations from the parameters of delegate
+     * methods to your delegating method. Currently Closure annotation members are
+     * not supported.
+     *
+     * @return true if generated delegate methods should keep parameter annotations
+     */
+    boolean parameterAnnotations() default false;
+
+    /**
+     * List of method and/or property names to exclude when delegating.
+     * Must not be used if 'includes' is used. For convenience, a String with comma separated names
+     * can be used in addition to an array (using Groovy's literal list notation) of String values.
+     * If interfaces is true (the default), you will need to manually supply any methods excluded
+     * from delegation that are required for the interface.
+     * @since 2.2.0
+     */
+    String[] excludes() default {};
+
+
+    /**
+     * List of interfaces containing method signatures to exclude when delegating.
+     * Only one of 'includes', 'includeTypes', 'excludes', 'excludeTypes' should be used.
+     * If interfaces is true (the default), you will need to manually supply any methods excluded
+     * from delegation that are required for the interface.
+     * @since 2.3.0
+     */
+    Class[] excludeTypes() default {};
+
+    /**
+     * List of method and/or property names to include when delegating.
+     * Must not be used if 'excludes' is used. For convenience, a String with comma separated names
+     * can be used in addition to an array (using Groovy's literal list notation) of String values.
+     * If interfaces is true (the default), you will need to manually supply any methods not included
+     * via delegation that are required for the interface.
+     * @since 2.2.0
+     */
+    String[] includes() default {};
+
+    /**
+     * List of interfaces containing method signatures to exclude when delegating.
+     * Only one of 'includes', 'includeTypes', 'excludes', 'excludeTypes' should be used.
+     * If interfaces is true (the default), you will need to manually supply any methods excluded
+     * from delegation that are required for the interface.
+     * @since 2.3.0
+     */
+    Class[] includeTypes() default {};
 }

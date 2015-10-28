@@ -1,17 +1,20 @@
-/*
- * Copyright 2008-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.transform;
 
@@ -26,7 +29,7 @@ import java.lang.annotation.Target;
  * Class annotation used to assist in the creation of {@code toString()} methods in classes.
  * The {@code @ToString} annotation instructs the compiler to execute an
  * AST transformation which adds the necessary toString() method.
- * <p/>
+ * <p>
  * It allows you to write classes in this shortened form:
  * <pre>
  * {@code @ToString}
@@ -77,7 +80,7 @@ import java.lang.annotation.Target;
  * AgedThing(age:5, super:NamedThing(Lassie))
  * </pre>
  * {@code @ToString} can also be used in conjunction with {@code @Canonical} and {@code @Immutable}.
- * <p/>
+ * <p>
  * If you want to omit fields or properties referring to <tt>null</tt>, you can use the <tt>ignoreNulls</tt> flag:
  * <pre>
  * import groovy.transform.ToString
@@ -90,7 +93,7 @@ import java.lang.annotation.Target;
  * <pre>
  * NamedThing()
  * </pre>
- * <p/>
+ * <p>
  * By default the fully-qualified class name is used as part of the generated toString.
  * If you want to exclude the package, you can set the includePackage flag to false, e.g.:
  * <pre>
@@ -136,17 +139,23 @@ public @interface ToString {
     String[] includes() default {};
 
     /**
-     * Whether to include super in generated toString.
+     * Whether to include the toString() of super in the generated toString.
      */
     boolean includeSuper() default false;
 
     /**
-     * Whether to include names of properties/fields in generated toString.
+     * Whether to include super properties in the generated toString.
+     * @since 2.4.0
+     */
+    boolean includeSuperProperties() default false;
+
+    /**
+     * Whether to include names of properties/fields in the generated toString.
      */
     boolean includeNames() default false;
 
     /**
-     * Include fields as well as properties in generated toString.
+     * Include fields as well as properties in the generated toString.
      */
     boolean includeFields() default false;
 
@@ -161,4 +170,12 @@ public @interface ToString {
      * @since 2.0.6
      */
     boolean includePackage() default true;
+
+    /**
+     * Whether to cache toString() calculations. You should only set this to true if
+     * you know the object is immutable (or technically mutable but never changed).
+     * @since 2.1.0
+     */
+    boolean cache() default false;
+
 }

@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.time;
 
@@ -21,17 +24,17 @@ import java.util.TimeZone;
 
 /**
  * Apply a number of methods to allow convenient Date/Time manipulation,such as:
- * <p/>
  * <pre>
  * use ( TimeCategory ) {
  *     // application on numbers:
  *     println 1.minute.from.now
  *     println 10.hours.ago
- * <p/>
+ *
  *     // application on dates
  *     def someDate = new Date()
  *     println someDate - 3.months
- * }</pre>
+ * }
+ * </pre>
  *
  * @see BaseDuration
  */
@@ -61,11 +64,12 @@ public class TimeCategory {
 
     /**
      * Retrieves the default TimeZone for a date by using the default Locale
-     * settings.
+     * settings. Recommended that you use {@code TimeZone.getDefault()} instead.
      *
      * @param self a Date
      * @return the TimeZone
      */
+    @Deprecated
     public static TimeZone getTimeZone(Date self) {
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(self);

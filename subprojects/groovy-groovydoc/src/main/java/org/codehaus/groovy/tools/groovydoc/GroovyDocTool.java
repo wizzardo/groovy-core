@@ -1,17 +1,20 @@
-/*
- * Copyright 2007-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools.groovydoc;
 
@@ -34,7 +37,8 @@ public class GroovyDocTool {
     private final Logger log = Logger.create(GroovyDocTool.class);
     private final GroovyRootDocBuilder rootDocBuilder;
     private final GroovyDocTemplateEngine templateEngine;
-    private Properties properties;
+
+    protected Properties properties;
 
     /**
      * Constructor for use by people who only want to interact with the Groovy Doclet Tree (rootDoc)
@@ -51,10 +55,19 @@ public class GroovyDocTool {
 
     public GroovyDocTool(ResourceManager resourceManager, String[] sourcepaths, String[] docTemplates, String[] packageTemplates, String[] classTemplates, List<LinkArgument> links, Properties properties) {
         rootDocBuilder = new GroovyRootDocBuilder(this, sourcepaths, links, properties);
-        String charset = properties.getProperty("charset");
-        properties.setProperty("charset", charset != null && charset.length() != 0 ? charset : Charset.defaultCharset().name());
-        this.properties = properties;
 
+        String defaultCharset = Charset.defaultCharset().name();
+
+        String fileEncoding = properties.getProperty("fileEncoding");
+        String charset = properties.getProperty("charset");
+
+        if (fileEncoding == null || fileEncoding.length() == 0) fileEncoding = charset;
+        if (charset == null || charset.length() == 0) charset = fileEncoding;
+
+        properties.setProperty("fileEncoding", fileEncoding != null && fileEncoding.length() != 0 ? fileEncoding : defaultCharset);
+        properties.setProperty("charset", charset != null && charset.length() != 0 ? charset : defaultCharset);
+
+        this.properties = properties;
 
         if (resourceManager == null) {
             templateEngine = null;
@@ -94,7 +107,7 @@ public class GroovyDocTool {
     String getPath(String filename) {
         String path = new File(filename).getParent();
         // path length of 1 indicates that probably is 'default package' i.e. "/"
-        if (path == null || path.length() == 1) {
+        if (path == null || (path.length() == 1 && !Character.isJavaIdentifierStart(path.charAt(0)))) {
             path = "DefaultPackage"; // "DefaultPackage" for 'default package' path, rather than null...
         }
         return path;

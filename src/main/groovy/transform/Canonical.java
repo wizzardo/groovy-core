@@ -1,17 +1,20 @@
-/*
- * Copyright 2008-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.transform;
 
@@ -24,7 +27,7 @@ import java.lang.annotation.Target;
 
 /**
  * Class annotation used to assist in the creation of mutable classes.
- * <p/>
+ * <p>
  * It allows you to write classes in this shortened form:
  * <pre>
  * {@code @Canonical} class Customer {
@@ -41,12 +44,15 @@ import java.lang.annotation.Target;
  * assert c1 == c2
  * </pre>
  *
- * If you set the autoDefaults flag to true, you don't need to provide all arguments in constructors calls,
- * in this case all properties not present are initialized to the default value, e.g.:
+ * You don't need to provide all arguments in constructor calls. If using named parameters, any property names not
+ * referenced will be given their default value (as per Java's default unless an explicit initialization constant is
+ * provided when defining the property). If using a tuple constructor, parameters are supplied in the order in which
+ * the properties are defined. Supplied parameters fill the tuple from the left. Any parameters missing on the right
+ * are given their default value.
  * <pre>
  * def c3 = new Customer(last: 'Jones', age: 21)
  * def c4 = new Customer('Tom', 'Jones')
- * 
+ *
  * assert null == c3.since
  * assert 0 == c4.age
  * assert c3.favItems == ['Food'] && c4.favItems == ['Food']
@@ -59,7 +65,7 @@ import java.lang.annotation.Target;
  * {@code @ToString} and {@code @TupleConstructor}. In addition, you can add one of
  * the other annotations if you need to further customize the behavior of the
  * AST transformation.
- * <p/>
+ * <p>
  * A class created in this way has the following characteristics:
  * <ul>
  * <li>A no-arg constructor is provided which allows you to set properties by name using Groovy's normal bean conventions.
@@ -78,15 +84,15 @@ import java.lang.annotation.Target;
  * </pre>
  * If an "underscore" version of the respective method already exists, then no default implementation is provided.
  * </ul>
- * <p/>
+ * <p>
  * If you want similar functionality to what this annotation provides but also require immutability, see the
- * {@code @Immutable} annotation.
- * <p/>
+ * {@code @}{@link Immutable} annotation.
+ * <p>
  * Limitations:
  * <ul>
- * <li>
- * If you explicitly add your own constructors, then the transformation will not add any other constructor to the class.
- * </li>
+ * <li>If you explicitly add your own constructors, then the transformation will not add any other constructor to the class</li>
+ * <li>Groovy's normal map-style naming conventions will not be available if the first property
+ * has type {@code LinkedHashMap} or if there is a single Map, AbstractMap or HashMap property</li>
  * </ul>
  *
  * @author Paulo Poiati
@@ -109,7 +115,7 @@ public @interface Canonical {
      *
      * If the {@code @Canonical} behavior is customised by using it in conjunction with one of the more specific
      * related annotations (i.e. {@code @ToString}, {@code @EqualsAndHashCode} or {@code @TupleConstructor}), then
-     * the value of this attribute can be overriden within the more specific annotation.
+     * the value of this attribute can be overridden within the more specific annotation.
      */
     String[] excludes() default {};
 
@@ -120,7 +126,7 @@ public @interface Canonical {
      *
      * If the {@code @Canonical} behavior is customised by using it in conjunction with one of the more specific
      * related annotations (i.e. {@code @ToString}, {@code @EqualsAndHashCode} or {@code @TupleConstructor}), then
-     * the value of this attribute can be overriden within the more specific annotation.
+     * the value of this attribute can be overridden within the more specific annotation.
      */
     String[] includes() default {};
 }

@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2010 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools.groovydoc;
 
@@ -54,7 +57,7 @@ public class GroovyDocWriter {
             String destFileName = destdir + FS + classDoc.getFullPathName() + ".html";
             log.debug("Generating " + destFileName);
             String renderedSrc = templateEngine.applyClassTemplates(classDoc);
-            output.writeToOutput(destFileName, renderedSrc);
+            output.writeToOutput(destFileName, renderedSrc, properties.getProperty("fileEncoding"));
         }
     }
 
@@ -71,7 +74,7 @@ public class GroovyDocWriter {
         }
         String destFileName = destdir + FS + "package-list";
         log.debug("Generating " + destFileName);
-        output.writeToOutput(destFileName, sb.toString());
+        output.writeToOutput(destFileName, sb.toString(), properties.getProperty("fileEncoding"));
     }
 
     public void writePackageToOutput(GroovyPackageDoc packageDoc, String destdir) throws Exception {
@@ -81,7 +84,7 @@ public class GroovyDocWriter {
             String renderedSrc = templateEngine.applyPackageTemplate(template, packageDoc);
             String destFileName = destdir + FS + packageDoc.name() + FS + tool.getFile(template);
             log.debug("Generating " + destFileName);
-            output.writeToOutput(destFileName, renderedSrc);
+            output.writeToOutput(destFileName, renderedSrc, properties.getProperty("fileEncoding"));
         }
     }
 
@@ -100,7 +103,7 @@ public class GroovyDocWriter {
                 templateEngine.copyBinaryResource(template, destFileName);
             } else {
                 String renderedSrc = templateEngine.applyRootDocTemplate(template, rootDoc);
-                output.writeToOutput(destFileName, renderedSrc);
+                output.writeToOutput(destFileName, renderedSrc, properties.getProperty("fileEncoding"));
             }
         }
     }

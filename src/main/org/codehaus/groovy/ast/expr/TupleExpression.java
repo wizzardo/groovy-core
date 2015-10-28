@@ -1,23 +1,24 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.ast.expr;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
@@ -25,9 +26,8 @@ import org.codehaus.groovy.ast.GroovyCodeVisitor;
  * Represents a tuple expression {1, 2, 3} which creates an immutable List
  * 
  * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @version $Revision$
  */
-public class TupleExpression extends Expression {
+public class TupleExpression extends Expression implements Iterable<Expression> {
     private List<Expression> expressions;
 
     public TupleExpression() {
@@ -90,7 +90,7 @@ public class TupleExpression extends Expression {
     }
 
     public String getText() {
-        StringBuffer buffer = new StringBuffer("(");
+        StringBuilder buffer = new StringBuilder("(");
         boolean first = true;
         for (Expression expression : expressions) {
             if (first) {
@@ -108,5 +108,9 @@ public class TupleExpression extends Expression {
 
     public String toString() {
         return super.toString() + expressions;
+    }
+
+    public Iterator<Expression> iterator() {
+        return Collections.unmodifiableList(expressions).iterator();
     }
 }

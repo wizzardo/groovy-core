@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2009 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.classgen.asm;
 
@@ -29,6 +32,7 @@ import org.codehaus.groovy.ast.InterfaceHelperClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.classgen.AsmClassGenerator;
 import org.codehaus.groovy.classgen.GeneratorContext;
+import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.SourceUnit;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -36,14 +40,21 @@ import org.objectweb.asm.Opcodes;
 
 public class WriterController {
 
-    private static Constructor indyWriter;
+    private static Constructor indyWriter, indyCallSiteWriter, indyBinHelper;
     static {
         try {
-            Class indyClass = WriterController.class.getClassLoader().loadClass("org.codehaus.groovy.classgen.asm.indy.InvokeDynamicWriter");
+            ClassLoader cl = WriterController.class.getClassLoader();
+            Class indyClass = cl.loadClass("org.codehaus.groovy.classgen.asm.indy.InvokeDynamicWriter");
             indyWriter = indyClass.getConstructor(WriterController.class);
+            indyClass = cl.loadClass("org.codehaus.groovy.classgen.asm.indy.IndyCallSiteWriter");
+            indyCallSiteWriter = indyClass.getConstructor(WriterController.class);
+            indyClass = cl.loadClass("org.codehaus.groovy.classgen.asm.indy.IndyBinHelper");
+            indyBinHelper = indyClass.getConstructor(WriterController.class);
         } catch (Exception e) {
             indyWriter = null;
-        }        
+            indyCallSiteWriter = null;
+            indyBinHelper = null;
+        }
     }
     private AsmClassGenerator acg;
     private MethodVisitor methodVisitor;
@@ -71,9 +82,11 @@ public class WriterController {
     private TypeChooser typeChooser;
     private int bytecodeVersion = Opcodes.V1_5;
     private int lineNumber = -1;
+    private int helperMethodIndex = 0;
 
     public void init(AsmClassGenerator asmClassGenerator, GeneratorContext gcon, ClassVisitor cv, ClassNode cn) {
-        Map<String,Boolean> optOptions = cn.getCompileUnit().getConfig().getOptimizationOptions();
+        CompilerConfiguration config = cn.getCompileUnit().getConfig();
+        Map<String,Boolean> optOptions = config.getOptimizationOptions();
         boolean invokedynamic=false;
         if (optOptions.isEmpty()) {
             // IGNORE
@@ -89,20 +102,23 @@ public class WriterController {
         this.classNode = cn;
         this.outermostClass = null;
         this.internalClassName = BytecodeHelper.getClassInternalName(classNode);
-        this.callSiteWriter = new CallSiteWriter(this);
-        
+
+        bytecodeVersion = chooseBytecodeVersion(invokedynamic, config.getTargetBytecode());
+
         if (invokedynamic) {
-            bytecodeVersion = Opcodes.V1_7;
             try {
                 this.invocationWriter = (InvocationWriter) indyWriter.newInstance(this);
+                this.callSiteWriter = (CallSiteWriter) indyCallSiteWriter.newInstance(this);
+                this.binaryExpHelper = (BinaryExpressionHelper) indyBinHelper.newInstance(this);
             } catch (Exception e) {
                 throw new GroovyRuntimeException("Cannot use invokedynamic, indy module was excluded from this build.");
             }
         } else {
+            this.callSiteWriter = new CallSiteWriter(this);
             this.invocationWriter = new InvocationWriter(this);
+            this.binaryExpHelper = new BinaryExpressionHelper(this);
         }
         
-        this.binaryExpHelper = new BinaryExpressionHelper(this);
         this.unaryExpressionHelper = new UnaryExpressionHelper(this);
         if (optimizeForInt) {
             this.fastPathBinaryExpHelper = new BinaryExpressionMultiTypeDispatcher(this);
@@ -128,6 +144,32 @@ public class WriterController {
             this.statementWriter = new StatementWriter(this);
         }
         this.typeChooser = new StatementMetaTypeChooser();
+    }
+
+    private static int chooseBytecodeVersion(final boolean invokedynamic, final String targetBytecode) {
+        if (invokedynamic) {
+            if (CompilerConfiguration.JDK8.equals(targetBytecode)) {
+                return Opcodes.V1_8;
+            }
+            return Opcodes.V1_7;
+        } else {
+            if (CompilerConfiguration.JDK4.equals(targetBytecode)) {
+                return Opcodes.V1_4;
+            }
+            if (CompilerConfiguration.JDK5.equals(targetBytecode)) {
+                return Opcodes.V1_5;
+            }
+            if (CompilerConfiguration.JDK6.equals(targetBytecode)) {
+                return Opcodes.V1_6;
+            }
+            if (CompilerConfiguration.JDK7.equals(targetBytecode)) {
+                return Opcodes.V1_7;
+            }
+            if (CompilerConfiguration.JDK8.equals(targetBytecode)) {
+                return Opcodes.V1_8;
+            }
+        }
+        throw new GroovyBugError("Bytecode version ["+targetBytecode+"] is not supported by the compiler");
     }
 
     public AsmClassGenerator getAcg() {
@@ -360,4 +402,8 @@ public class WriterController {
 	public void resetLineNumber() {
 		setLineNumber(-1);
 	}
+
+    public int getNextHelperMethodIndex() {
+        return helperMethodIndex++;
+    }
 }

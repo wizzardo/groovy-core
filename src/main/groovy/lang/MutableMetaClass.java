@@ -1,36 +1,37 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.lang;
 
 import java.lang.reflect.Method;
 
 /**
- * <p>An interface that defines methods that implementers of mutable Meta classes should specify. It provides operations to perform mutations
- * on the MetaClass instance.</p>
- *
- * <p>Whether a MetaClass allows mutation is up to the MetaClass itself and considerations of Thread safety
- * need to be taken into account when making a MetaClass mutable</p>
- *
- * <p>The default implementation allows mutation of MetaClass instances before initialisation (before the initialize() method is called)
- * but not after, thus ensuring Thread safety once a MetaClass has been constructed and placed in the registry</p>
+ * An interface that defines methods that implementers of mutable Meta classes should specify. It provides operations to perform mutations
+ * on the MetaClass instance.
+ * <p>
+ * Whether a MetaClass allows mutation is up to the MetaClass itself and considerations of Thread safety
+ * need to be taken into account when making a MetaClass mutable
+ * <p>
+ * The default implementation allows mutation of MetaClass instances before initialisation (before the initialize() method is called)
+ * but not after, thus ensuring Thread safety once a MetaClass has been constructed and placed in the registry
  *
  * @see MetaClassImpl
  * @see MetaClass
- *
  * @author Graeme Rocher
  * @since 1.5
  */

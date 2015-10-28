@@ -1,19 +1,25 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.runtime;
+
+import groovy.lang.Closure;
+import groovy.lang.GroovyRuntimeException;
 
 import java.sql.Timestamp;
 import java.text.DateFormat;
@@ -111,18 +117,20 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
 
     /**
      * Support mutating a Calendar with a Map.
-     * <p/>
+     * <p>
      * The map values are the normal values provided as the
      * second parameter to <code>java.util.Calendar#set(int, int)</code>.
      * The keys can either be the normal fields values provided as
      * the first parameter to that method or one of the following Strings:
      * <table border="1" cellpadding="4">
-     * <tr><td>year</td><td>Calendar.YEAR</td></tr>
-     * <tr><td>month</td><td>Calendar.MONTH</td></tr>
-     * <tr><td>date</td><td>Calendar.DATE</td></tr>
-     * <tr><td>hourOfDay</td><td>Calendar.HOUR_OF_DAY</td></tr>
-     * <tr><td>minute</td><td>Calendar.MINUTE</td></tr>
-     * <tr><td>second</td><td>Calendar.SECOND</td></tr>
+     *   <caption>Calendar index values</caption>
+     *   <tr><td>year</td><td>Calendar.YEAR</td></tr>
+     *   <tr><td>month</td><td>Calendar.MONTH</td></tr>
+     *   <tr><td>date</td><td>Calendar.DATE</td></tr>
+     *   <tr><td>dayOfMonth</td><td>Calendar.DATE</td></tr>
+     *   <tr><td>hourOfDay</td><td>Calendar.HOUR_OF_DAY</td></tr>
+     *   <tr><td>minute</td><td>Calendar.MINUTE</td></tr>
+     *   <tr><td>second</td><td>Calendar.SECOND</td></tr>
      * </table>
      * Example usage:
      * <pre>
@@ -134,7 +142,7 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * m[DATE] = 25
      * cal.set(m)
      * println cal.time // Christmas 2010
-     * <p/>
+     *
      * cal.set(year:2011, month:DECEMBER, date:25)
      * println cal.time // Christmas 2010
      * </pre>
@@ -154,16 +162,28 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     /**
+     * Legacy alias for copyWith. Will be deprecated and removed in future versions of Groovy.
+     *
+     * @see #copyWith(java.util.Calendar, java.util.Map)
+     * @since 1.7.3
+     */
+    public static Calendar updated(Calendar self, Map<Object, Integer> updates) {
+        Calendar result = (Calendar) self.clone();
+        set(result, updates);
+        return result;
+    }
+
+    /**
      * Support creating a new Date having similar properties to
      * an existing Date (which remains unaltered) but with
      * some fields updated according to a Map of changes.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * import static java.util.Calendar.YEAR
      * def now = Calendar.instance
      * def nextYear = now[YEAR] + 1
-     * def oneYearFromNow = now.updated(year: nextYear)
+     * def oneYearFromNow = now.copyWith(year: nextYear)
      * println now.time
      * println oneYearFromNow.time
      * </pre>
@@ -174,21 +194,31 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * @see java.util.Calendar#set(int, int)
      * @see java.util.Calendar#set(int, int, int, int, int, int)
      * @see #set(java.util.Calendar, java.util.Map)
-     * @since 1.7.3
+     * @since 2.2.0
      */
-    public static Calendar updated(Calendar self, Map<Object, Integer> updates) {
+    public static Calendar copyWith(Calendar self, Map<Object, Integer> updates) {
         Calendar result = (Calendar) self.clone();
-        for (Map.Entry<Object, Integer> entry : updates.entrySet()) {
-            Object key = entry.getKey();
-            if (key instanceof String) key = CAL_MAP.get(key);
-            if (key instanceof Integer) result.set((Integer) key, entry.getValue());
-        }
+        set(result, updates);
         return result;
     }
 
     /**
      * Support mutating a Date with a Map.
-     * <p/>
+     * <p>
+     * The map values are the normal values provided as the
+     * second parameter to <code>java.util.Calendar#set(int, int)</code>.
+     * The keys can either be the normal fields values provided as
+     * the first parameter to that method or one of the following Strings:
+     * <table border="1" cellpadding="4">
+     *   <caption>Calendar index values</caption>
+     *   <tr><td>year</td><td>Calendar.YEAR</td></tr>
+     *   <tr><td>month</td><td>Calendar.MONTH</td></tr>
+     *   <tr><td>date</td><td>Calendar.DATE</td></tr>
+     *   <tr><td>dayOfMonth</td><td>Calendar.DATE</td></tr>
+     *   <tr><td>hourOfDay</td><td>Calendar.HOUR_OF_DAY</td></tr>
+     *   <tr><td>minute</td><td>Calendar.MINUTE</td></tr>
+     *   <tr><td>second</td><td>Calendar.SECOND</td></tr>
+     * </table>
      * Example usage:
      * <pre>
      * import static java.util.Calendar.YEAR
@@ -212,16 +242,29 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     /**
+     * Legacy alias for copyWith. Will be deprecated and removed in future versions of Groovy.
+     *
+     * @see #copyWith(java.util.Date, java.util.Map)
+     * @since 1.7.3
+     */
+    public static Date updated(Date self, Map<Object, Integer> updates) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(self);
+        set(cal, updates);
+        return cal.getTime();
+    }
+
+    /**
      * Support creating a new Date having similar properties to
      * an existing Date (which remains unaltered) but with
      * some fields updated according to a Map of changes.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * import static java.util.Calendar.YEAR
      * def today = new Date()
      * def nextYear = today[YEAR] + 1
-     * def oneYearFromNow = today.updated(year: nextYear)
+     * def oneYearFromNow = today.copyWith(year: nextYear)
      * println today
      * println oneYearFromNow
      * </pre>
@@ -231,11 +274,10 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * @return The newly created Date
      * @see java.util.Calendar#set(int, int)
      * @see #set(java.util.Date, java.util.Map)
-     * @see #set(java.util.Calendar, java.util.Map)
-     * @see #updated(java.util.Calendar, java.util.Map)
-     * @since 1.7.3
+     * @see #copyWith(java.util.Calendar, java.util.Map)
+     * @since 2.2.0
      */
-    public static Date updated(Date self, Map<Object, Integer> updates) {
+    public static Date copyWith(Date self, Map<Object, Integer> updates) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(self);
         set(cal, updates);
@@ -248,6 +290,7 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
         CAL_MAP.put("year", Calendar.YEAR);
         CAL_MAP.put("month", Calendar.MONTH);
         CAL_MAP.put("date", Calendar.DATE);
+        CAL_MAP.put("dayOfMonth", Calendar.DATE);
         CAL_MAP.put("hourOfDay", Calendar.HOUR_OF_DAY);
         CAL_MAP.put("minute", Calendar.MINUTE);
         CAL_MAP.put("second", Calendar.SECOND);
@@ -403,9 +446,9 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
 
     /**
      * Subtract another date from this one and return the number of days of the difference.
-     * <p/>
+     * <p>
      * Date self = Date then + (Date self - Date then)
-     * <p/>
+     * <p>
      * IOW, if self is before then the result is a negative value.
      *
      * @param self a Calendar
@@ -444,9 +487,9 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
 
     /**
      * Subtract another Date from this one and return the number of days of the difference.
-     * <p/>
+     * <p>
      * Date self = Date then + (Date self - Date then)
-     * <p/>
+     * <p>
      * IOW, if self is before then the result is a negative value.
      *
      * @param self a Date
@@ -464,15 +507,15 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
 
     /**
      * <p>Create a String representation of this date according to the given
-     * format pattern.</p>
-     * <p/>
+     * format pattern.
+     * <p>
      * <p>For example, if the system timezone is GMT,
      * <code>new Date(0).format('MM/dd/yy')</code> would return the string
      * <code>"01/01/70"</code>. See documentation for {@link java.text.SimpleDateFormat}
-     * for format pattern use.</p>
-     * <p/>
+     * for format pattern use.
+     * <p>
      * <p>Note that a new DateFormat instance is created for every
-     * invocation of this method (for thread safety).</p>
+     * invocation of this method (for thread safety).
      *
      * @param self   a Date
      * @param format the format pattern to use according to {@link java.text.SimpleDateFormat}
@@ -486,8 +529,8 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
 
     /**
      * <p>Create a String representation of this date according to the given
-     * format pattern and timezone.</p>
-     * <p/>
+     * format pattern and timezone.
+     * <p>
      * <p>For example:
      * <code>
      * def d = new Date(0)
@@ -495,10 +538,10 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * println d.format('dd/MMM/yyyy', tz)
      * </code> would return the string
      * <code>"01/Jan/1970"</code>. See documentation for {@link java.text.SimpleDateFormat}
-     * for format pattern use.</p>
-     * <p/>
+     * for format pattern use.
+     * <p>
      * <p>Note that a new DateFormat instance is created for every
-     * invocation of this method (for thread safety).</p>
+     * invocation of this method (for thread safety).
      *
      * @param self   a Date
      * @param format the format pattern to use according to {@link java.text.SimpleDateFormat}
@@ -516,10 +559,10 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
     /**
      * <p>Return a string representation of the 'day' portion of this date
      * according to the locale-specific {@link java.text.DateFormat#SHORT} default format.
-     * For an "en_UK" system locale, this would be <code>dd/MM/yy</code>.</p>
-     * <p/>
+     * For an "en_UK" system locale, this would be <code>dd/MM/yy</code>.
+     * <p>
      * <p>Note that a new DateFormat instance is created for every
-     * invocation of this method (for thread safety).</p>
+     * invocation of this method (for thread safety).
      *
      * @param self a Date
      * @return a string representation of this date
@@ -534,10 +577,10 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
     /**
      * <p>Return a string representation of the time portion of this date
      * according to the locale-specific {@link java.text.DateFormat#MEDIUM} default format.
-     * For an "en_UK" system locale, this would be <code>HH:MM:ss</code>.</p>
-     * <p/>
+     * For an "en_UK" system locale, this would be <code>HH:MM:ss</code>.
+     * <p>
      * <p>Note that a new DateFormat instance is created for every
-     * invocation of this method (for thread safety).</p>
+     * invocation of this method (for thread safety).
      *
      * @param self a Date
      * @return a string representing the time portion of this date
@@ -554,10 +597,10 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * this Date instance, according to the locale-specific format used by
      * {@link java.text.DateFormat}.  This method uses the {@link java.text.DateFormat#SHORT}
      * preset for the day portion and {@link java.text.DateFormat#MEDIUM} for the time
-     * portion of the output string.</p>
-     * <p/>
+     * portion of the output string.
+     * <p>
      * <p>Note that a new DateFormat instance is created for every
-     * invocation of this method (for thread safety).</p>
+     * invocation of this method (for thread safety).
      *
      * @param self a Date
      * @return a string representation of this date and time
@@ -630,7 +673,7 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * <p>Shortcut for {@link java.text.SimpleDateFormat} to output a String representation
      * of this calendar instance.  This method respects the Calendar's assigned
      * {@link java.util.TimeZone}, whereas calling <code>cal.time.format('HH:mm:ss')</code>
-     * would use the system timezone.</p>
+     * would use the system timezone.
      * <p>Note that Calendar equivalents of <code>date.getDateString()</code>
      * and variants do not exist because those methods are Locale-dependent.
      * Although a Calendar may be assigned a {@link java.util.Locale}, that information is
@@ -638,7 +681,7 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
      * provided by these methods.  Instead, the system Locale would always be
      * used.  The alternative is to simply call
      * {@link java.text.DateFormat#getDateInstance(int, java.util.Locale)} and pass the same Locale
-     * that was used for the Calendar.</p>
+     * that was used for the Calendar.
      *
      * @param self    this calendar
      * @param pattern format pattern
@@ -654,4 +697,79 @@ public class DateGroovyMethods extends DefaultGroovyMethodsSupport {
         return sdf.format(self.getTime());
     }
 
+    /**
+     * Iterates from this date up to the given date, inclusive,
+     * incrementing by one day each time.
+     *
+     * @param self    a Date
+     * @param to      another Date to go up to
+     * @param closure the closure to call
+     * @since 2.2
+     */
+    public static void upto(Date self, Date to, Closure closure) {
+        if (self.compareTo(to) <= 0) {
+            for (Date i = (Date) self.clone(); i.compareTo(to) <= 0; i = next(i)) {
+                closure.call(i);
+            }
+        } else
+            throw new GroovyRuntimeException("The argument (" + to + 
+                    ") to upto() cannot be earlier than the value (" + self + ") it's called on.");
+    }
+
+    /**
+     * Iterates from the date represented by this calendar up to the date represented
+     * by the given calendar, inclusive, incrementing by one day each time.
+     *
+     * @param self    a Calendar
+     * @param to      another Calendar to go up to
+     * @param closure the closure to call
+     * @since 2.2
+     */
+    public static void upto(Calendar self, Calendar to, Closure closure) {
+        if (self.compareTo(to) <= 0) {
+            for (Calendar i = (Calendar) self.clone(); i.compareTo(to) <= 0; i = next(i)) {
+                closure.call(i);
+            }
+        } else
+            throw new GroovyRuntimeException("The argument (" + to + 
+                    ") to upto() cannot be earlier than the value (" + self + ") it's called on.");
+    }
+
+    /**
+     * Iterates from this date down to the given date, inclusive,
+     * decrementing by one day each time.
+     *
+     * @param self    a Date
+     * @param to      another Date to go down to
+     * @param closure the closure to call
+     * @since 2.2
+     */
+    public static void downto(Date self, Date to, Closure closure) {
+        if (self.compareTo(to) >= 0) {
+            for (Date i = (Date) self.clone(); i.compareTo(to) >= 0; i = previous(i)) {
+                closure.call(i);
+            }
+        } else
+            throw new GroovyRuntimeException("The argument (" + to + 
+                    ") to downto() cannot be later than the value (" + self + ") it's called on.");
+    }
+
+    /**
+     * Iterates from the date represented by this calendar up to the date represented
+     * by the given calendar, inclusive, incrementing by one day each time.
+     *
+     * @param self    a Calendar
+     * @param to      another Calendar to go down to
+     * @param closure the closure to call
+     * @since 2.2
+     */
+    public static void downto(Calendar self, Calendar to, Closure closure) {
+        if (self.compareTo(to) >= 0) {
+            for (Calendar i = (Calendar) self.clone(); i.compareTo(to) >= 0; i = previous(i)) {
+                closure.call(i);
+            }
+        } else
+            throw new GroovyRuntimeException("The argument (" + to + 
+                    ") to downto() cannot be later than the value (" + self + ") it's called on.");
+    }
 }

@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2010 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.sql;
 
@@ -34,9 +37,9 @@ import org.codehaus.groovy.runtime.InvokerInvocationException;
  * here from the original GroovyResultSet class. The methods in this class are
  * used by the proxy GroovyResultSetProxy, which will try to invoke methods
  * on this class before invoking it on ResultSet.
- * <p/>
- * <p><b>This class is not intended to be used directly. Should be used through
- * GroovyResultSetProxy only!</b></p>
+ * <p>
+ * <b>This class is not intended to be used directly. Should be used through
+ * GroovyResultSetProxy only!</b>
  *
  * @author Jochen Theodorou
  * @see GroovyResultSet
@@ -69,7 +72,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
 
     public String toString() {
         try {
-            StringBuffer sb = new StringBuffer("[");
+            StringBuilder sb = new StringBuilder("[");
             ResultSetMetaData metaData = resultSet.getMetaData();
             int count = metaData.getColumnCount();
             for (int i = 1; i <= count; i++) {
@@ -224,7 +227,7 @@ public class GroovyResultSetExtension extends GroovyObjectSupport {
      * before the first row; the first call to the method
      * <code>next</code> makes the first row the current row; the
      * second call makes the second row the current row, and so on.
-     * <p/>
+     * <p>
      * <P>If an input stream is open for the current row, a call
      * to the method <code>next</code> will
      * implicitly close it. A <code>getResultSet()</code> object's

@@ -1,20 +1,24 @@
 /*
- * Copyright 2003-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.classgen.asm
 
+import static org.codehaus.groovy.control.CompilerConfiguration.DEFAULT as config
 /**
  * @author Jochen Theodorou
  */
@@ -23,6 +27,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     // make a test for native compilation of the ackerman function
     // and ensure the nested call is optimized
     void testAckerman() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: 'A', '''
             int A(int x, int y) {
                 if (x == 0) return y+1
@@ -72,6 +77,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testForLoopSettingArray() {
+        if (config.optimizationOptions.indy) return;
         assert compile('''
             int n = 10
             int[] x = new int[n]
@@ -109,6 +115,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testArrayIncrement() {
+        if (config.optimizationOptions.indy) return;
         assert compile('''
             int n = 10
             int[] x = new int[n]
@@ -158,6 +165,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testForLoopSettingArrayWithOperatorUsedInAssignmentAndArrayRHS() {
+        if (config.optimizationOptions.indy) return;
         assert compile('''
             int n = 10
             int[] x = new int[n]
@@ -192,11 +200,12 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
             'ICONST_1',
             'IADD',
             'ISTORE',
-            'GOTO L14'
+            'GOTO'
         ])
     }
 
     void testRightShiftUnsignedWithLongArgument() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: "hashCode", '''
             class X{
                 long _tagReservationDate
@@ -226,6 +235,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testObjectArraySet() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: "foo", '''
             class X {
                 void foo() {
@@ -240,6 +250,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testBooleanArraySet() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: "foo", '''
             class X{
                 void foo() {
@@ -254,6 +265,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testArray() {
+        if (config.optimizationOptions.indy) return;
         def methods = [
             "short"     :   [1, "sArraySet ([SIS)V", "sArrayGet ([SI)S"],
             "int"       :   [1, "intArraySet ([III)V", "intArrayGet ([II)I"],
@@ -310,6 +322,7 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
     }
 
     void testFib() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: "fib", """
             int fib(int i) {
                 i < 2 ? 1 : fib(i - 2) + fib(i - 1)
@@ -337,9 +350,19 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
             'IADD',
             'IRETURN'
         ])
+
+        // check that there is no fastpath for this method, since n is Object
+        def seq = compile(method: "fib", """
+            def fib(n) {
+                n<=2L?n:fib(n-1L)+fib(n-2L)
+            }
+        """).toSequence()
+        // isOrigXY is used for the fastpath guards
+        assert !seq.contains("isOrig")
     }
 
     void testNoBoxUnbox() {
+        if (config.optimizationOptions.indy) return;
         assert compile(method: "someCode", """
             public boolean someCall() {
                 return true;
@@ -355,5 +378,38 @@ class MethodPatternsTest extends AbstractBytecodeTestCase {
             'ILOAD',
             'IRETURN',
         ])
+    }
+
+    void testDiv() {
+        if (config.optimizationOptions.indy) return;
+        def types = [
+            "byte", "short", "int", "long", "double", "float"]
+        types.each {type ->
+            assert compile(method: "someCode","""
+                def someCode() {
+                    $type v = 5/4
+                }
+            """).hasSequence(["IDIV"])
+        }
+        types.each {type ->
+            assert compile(method: "someCode","""
+                def someCode() {
+                    $type v = 0
+                    v = 5/4
+                }
+            """).hasSequence(["IDIV"])
+        }
+
+        assert compile(method: "someCode", """
+            def someCode() {
+                long l = 5l/4l
+            }
+        """).hasSequence(["LDIV"])
+        assert compile(method: "someCode", """
+            def someCode() {
+                long l
+                l = 5l/4l
+            }
+        """).hasSequence(["LDIV"])
     }
 }

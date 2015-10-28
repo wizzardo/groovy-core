@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.ant;
 
@@ -32,6 +35,7 @@ import org.apache.tools.ant.types.Reference;
 import org.apache.tools.ant.util.FileUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 import org.codehaus.groovy.tools.ErrorReporter;
@@ -51,15 +55,14 @@ import java.util.Vector;
 
 /**
  * Executes a series of Groovy statements.
- * <p/>
+ * <p>
  * <p>Statements can either be read in from a text file using
- * the <i>src</i> attribute or from between the enclosing groovy tags.</p>
- *
- * @version $Id$
+ * the <i>src</i> attribute or from between the enclosing groovy tags.
  */
 public class Groovy extends Java {
     private static final String PREFIX = "embedded_script_in_";
     private static final String SUFFIX = "groovy_Ant_task";
+    private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     private final LoggingHelper log = new LoggingHelper(this);
 
@@ -93,9 +96,13 @@ public class Groovy extends Java {
     private boolean includeAntRuntime = true;
     private boolean useGroovyShell = false;
 
+    private boolean indy = false;
+    private String scriptBaseClass;
+    private String configscript;
+
     /**
      * Compiler configuration.
-     * <p/>
+     * <p>
      * Used to specify the debug output to print stacktraces in case something fails.
      * TODO: Could probably be reused to specify the encoding of the files to load or other properties.
      */
@@ -157,7 +164,7 @@ public class Groovy extends Java {
      * Set an inline command to execute.
      * NB: Properties are not expanded in this text.
      *
-     * @param txt the inline groovy ommands to execute
+     * @param txt the inline groovy commands to execute
      */
     public void addText(String txt) {
         log("addText('" + txt + "')", Project.MSG_VERBOSE);
@@ -235,6 +242,32 @@ public class Groovy extends Java {
     }
 
     /**
+     * Sets the configuration script for the groovy compiler configuration.
+     *
+     * @param configscript path to the configuration script
+     */
+    public void setConfigscript(final String configscript) {
+        this.configscript = configscript;
+    }
+
+    /**
+     * Sets the indy flag to enable or disable invokedynamic
+     *
+     * @param indy true means invokedynamic support is active
+     */
+    public void setIndy(final boolean indy) {
+        this.indy = indy;
+    }
+
+    /**
+     * Set the script base class name
+     * @param scriptBaseClass the name of the base class for scripts
+     */
+    public void setScriptBaseClass(final String scriptBaseClass) {
+        this.scriptBaseClass = scriptBaseClass;
+    }
+
+    /**
      * Load the file and then execute it
      */
     public void execute() throws BuildException {
@@ -295,7 +328,7 @@ public class Groovy extends Java {
     }
 
     private static String getText(BufferedReader reader) throws IOException {
-        StringBuffer answer = new StringBuffer();
+        StringBuilder answer = new StringBuilder();
         // reading the content of the file within a char buffer allow to keep the correct line endings
         char[] charBuffer = new char[4096];
         int nbCharRead = 0;
@@ -321,7 +354,7 @@ public class Groovy extends Java {
     protected void runStatements(Reader reader, PrintStream out)
             throws IOException {
         log.debug("runStatements()");
-        StringBuffer txt = new StringBuffer();
+        StringBuilder txt = new StringBuilder();
         String line = "";
         BufferedReader in = new BufferedReader(reader);
 
@@ -363,6 +396,7 @@ public class Groovy extends Java {
                 createNewArgs(txt);
                 super.setFork(fork);
                 super.setClassname(useGroovyShell ? "groovy.lang.GroovyShell" : "org.codehaus.groovy.ant.Groovy");
+                configureCompiler();
                 super.execute();
             } catch (Exception e) {
                 StringWriter writer = new StringWriter();
@@ -389,7 +423,7 @@ public class Groovy extends Java {
                 final Field contextField = propsHandler.getClass().getDeclaredField("context");
                 contextField.setAccessible(true);
                 final Object context = contextField.get(propsHandler);
-                mavenPom = InvokerHelper.invokeMethod(context, "getProject", new Object[0]);
+                mavenPom = InvokerHelper.invokeMethod(context, "getProject", EMPTY_OBJECT_ARRAY);
             }
             catch (Exception e) {
                 throw new BuildException("Impossible to retrieve Maven's Ant project: " + e.getMessage(), getLocation());
@@ -408,7 +442,7 @@ public class Groovy extends Java {
         final String scriptName = computeScriptName();
         final GroovyClassLoader classLoader = new GroovyClassLoader(baseClassLoader);
         addClassPathes(classLoader);
-
+        configureCompiler();
         final GroovyShell groovy = new GroovyShell(classLoader, new Binding(), configuration);
         try {
             parseAndRunScript(groovy, txt, mavenPom, scriptName, null, new AntBuilder(this));
@@ -416,6 +450,33 @@ public class Groovy extends Java {
             groovy.resetLoadedClasses();
             groovy.getClassLoader().clearCache();
             if (contextClassLoader || maven) thread.setContextClassLoader(savedLoader);
+        }
+    }
+
+    private void configureCompiler() {
+        if (scriptBaseClass!=null) {
+            configuration.setScriptBaseClass(scriptBaseClass);
+        }
+        if (indy) {
+            configuration.getOptimizationOptions().put("indy", Boolean.TRUE);
+            configuration.getOptimizationOptions().put("int", Boolean.FALSE);
+        }
+        if (configscript!=null) {
+            Binding binding = new Binding();
+            binding.setVariable("configuration", configuration);
+
+            CompilerConfiguration configuratorConfig = new CompilerConfiguration();
+            ImportCustomizer customizer = new ImportCustomizer();
+            customizer.addStaticStars("org.codehaus.groovy.control.customizers.builder.CompilerCustomizationBuilder");
+            configuratorConfig.addCompilationCustomizers(customizer);
+
+            GroovyShell shell = new GroovyShell(binding, configuratorConfig);
+            File confSrc = new File(configscript);
+            try {
+                shell.evaluate(confSrc);
+            } catch (IOException e) {
+                throw new BuildException("Unable to configure compiler using configuration file: "+confSrc, e);
+            }
         }
     }
 
@@ -576,7 +637,7 @@ public class Groovy extends Java {
      */
     protected void printResults(PrintStream out) {
         log.debug("printResults()");
-        StringBuffer line = new StringBuffer();
+        StringBuilder line = new StringBuilder();
         out.println(line);
         out.println();
     }

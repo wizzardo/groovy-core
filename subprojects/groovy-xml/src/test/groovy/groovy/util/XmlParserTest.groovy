@@ -1,17 +1,20 @@
 /*
- * Copyright 2003-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.util
 
@@ -37,7 +40,7 @@ class XmlParserTest extends GroovyTestCase {
   </tr>
   <tr align="left">
     <td><dc:author>
-      <g:developer>Dierk König</g:developer>,
+      <g:developer>Dierk Kï¿½nig</g:developer>,
       <g:advocate>Andrew Glover</g:advocate>,
       <g:developer>Paul King</g:developer>,
       <g:projectmanager>Guillaume Laforge</g:projectmanager>,
@@ -57,17 +60,17 @@ class XmlParserTest extends GroovyTestCase {
         def text = """
 <p>Please read the <a href="index.html">Home</a> page</p>
 """
-        def node = new XmlParser().parseText(text)
-        def StringWriter sw = new StringWriter()
+        def node = new XmlParser(trimWhitespace: true).parseText(text)
+        StringWriter sw = new StringWriter()
         new NodePrinter(new PrintWriter(sw)).print(node)
         def result = fixEOLs(sw.toString())
         def expected = '''\
 p() {
-  builder.append(Please read the)
+  Please read the
   a(href:'index.html') {
-    builder.append(Home)
+    Home
   }
-  builder.append(page)
+  page
 }
 '''
         assert result == expected
@@ -77,8 +80,8 @@ p() {
         def text = """
 <p>Please read the <a href="index.html">Home</a> page</p>
 """
-        def node = new XmlParser().parseText(text)
-        def StringWriter sw = new StringWriter()
+        def node = new XmlParser(trimWhitespace: true).parseText(text)
+        StringWriter sw = new StringWriter()
         new XmlNodePrinter(new PrintWriter(sw)).print(node)
         def result = fixEOLs(sw.toString())
         def expected = '''\
@@ -94,8 +97,8 @@ p() {
     }
 
     void testXmlNodePrinterNamespaces() {
-        def html = new XmlParser().parseText(bookXml)
-        def StringWriter sw = new StringWriter()
+        def html = new XmlParser(trimWhitespace: true).parseText(bookXml)
+        StringWriter sw = new StringWriter()
         new XmlNodePrinter(new PrintWriter(sw)).print(html)
         def result = fixEOLs(sw.toString())
         def expected = '''\
@@ -130,7 +133,7 @@ p() {
         <td>
           <dc:author xmlns:dc="http://purl.org/dc/elements/1.1/">
             <g:developer xmlns:g="http://groovy.codehaus.org/roles">
-              Dierk König
+              Dierk Kï¿½nig
             </g:developer>
             ,
             <g:advocate xmlns:g="http://groovy.codehaus.org/roles">
@@ -206,6 +209,7 @@ p() {
         GpathSyntaxTestSupport.checkElementTypes(getRoot)
         GpathSyntaxTestSupport.checkElementClosureInteraction(getRoot)
         GpathSyntaxTestSupport.checkElementTruth(getRoot)
+        GpathSyntaxTestSupport.checkCDataText(getRoot)
     }
 
     void testAttribute() {
@@ -238,11 +242,12 @@ p() {
 
     void testMixedMarkup() {
         MixedMarkupTestSupport.checkMixedMarkup(getRoot)
+        MixedMarkupTestSupport.checkMixedMarkupText(getRoot)
     }
 
     void testWhitespaceTrimming() {
         def text = '<outer><inner>   Here is some text    </inner></outer>'
-        def parser = new XmlParser()
+        def parser = new XmlParser(trimWhitespace: true)
         def outer = parser.parseText(text)
         assert outer.inner.text() == 'Here is some text'
         parser.setTrimWhitespace false
@@ -275,6 +280,28 @@ p() {
   <child attr="child attr">
     child text
   </child>
+</root>
+'''
+    }
+
+    void testReplaceNode() {
+        def xml = '<root><old/></root>'
+        def parser = new XmlParser()
+        def root = parser.parseText(xml)
+        def old = root.old[0]
+        def replacement = '<new><child/></new>'
+        def replacementNode = parser.parseText(replacement)
+        def removed = old.replaceNode(replacementNode)
+        assert removed.name() == 'old'
+
+        def writer = new StringWriter()
+        new XmlNodePrinter(new PrintWriter(writer)).print(root)
+        def result = writer.toString()
+        assert result == '''\
+<root>
+  <new>
+    <child/>
+  </new>
 </root>
 '''
     }

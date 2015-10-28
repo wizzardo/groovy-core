@@ -1,21 +1,25 @@
-/*
- * Copyright 2008-2009 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.runtime;
 
 import groovy.lang.GString;
+import org.codehaus.groovy.runtime.typehandling.ShortTypeHandling;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -447,10 +451,10 @@ public class SwingGroovyMethods {
 
     /**
      * Overloads the left shift operator to provide an easy way to add
-     * rows to a DefaultTableModel.<p>
-     * <p/>
-     * if row.size &lt; model.size -&gt; row will be padded with nulls<br/>
-     * if row.size &gt; model.size -&gt; additional columns will be discarded<br/>
+     * rows to a DefaultTableModel.
+     * <p>
+     * if row.size &lt; model.size -&gt; row will be padded with nulls<br>
+     * if row.size &gt; model.size -&gt; additional columns will be discarded<br>
      *
      * @param self a DefaultTableModel
      * @param row  a row to be added to the model.
@@ -472,9 +476,9 @@ public class SwingGroovyMethods {
      * <b>WARNING:</b> this operation does not replace the item at the
      * specified index, rather it inserts the item at that index, thus
      * increasing the size of the model by 1.<p>
-     * <p/>
-     * if row.size &lt; model.size -&gt; row will be padded with nulls<br/>
-     * if row.size &gt; model.size -&gt; additional columns will be discarded<br/>
+     * <p>
+     * if row.size &lt; model.size -&gt; row will be padded with nulls<br>
+     * if row.size &gt; model.size -&gt; additional columns will be discarded
      *
      * @param self  a DefaultTableModel
      * @param index an index
@@ -673,7 +677,7 @@ public class SwingGroovyMethods {
      */
     @SuppressWarnings("unchecked")
     public static Iterator<TreeNode> iterator(TreeNode self) {
-        return DefaultGroovyMethods.iterator(self.children());
+        return (Iterator<TreeNode>) DefaultGroovyMethods.iterator(self.children());
     }
 
     /**
@@ -1045,5 +1049,16 @@ public class SwingGroovyMethods {
      */
     public static Component getAt(JToolBar self, int index) {
         return self.getComponentAtIndex(index);
+    }
+
+    /**
+     * Allows the usage of a one-element string for a mnemonic
+     * @param button a AbstractButton
+     * @param mnemonic the String
+     * @since 2.3.7
+     */
+    public static void setMnemonic(AbstractButton button, String mnemonic) {
+        char c = ShortTypeHandling.castToChar(mnemonic);
+        button.setMnemonic(c);
     }
 }

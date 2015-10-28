@@ -1,19 +1,21 @@
-/*
- * Copyright 2003-2011 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package org.codehaus.groovy.control.customizers;
 
 import org.codehaus.groovy.ast.*;
@@ -32,29 +34,28 @@ import java.util.*;
  * This customizer allows securing source code by controlling what code constructs are allowed. For example, if you only
  * want to allow arithmetic operations in a groovy shell, you can configure this customizer to restrict package imports,
  * method calls and so on.
- * <p/>
- * Most of the securization options found in this class work with either blacklist or whitelist. This means that, for a
+ * <p>
+ * Most of the security customization options found in this class work with either blacklist or whitelist. This means that, for a
  * single option, you can set a whitelist OR a blacklist, but not both. You can mix whitelist/blacklist strategies for
  * different options. For example, you can have import whitelist and tokens blacklist.
- * <p/>
- * The recommanded way of securing shells is to use whitelists because it is guaranteed that future features of the
+ * <p>
+ * The recommended way of securing shells is to use whitelists because it is guaranteed that future features of the
  * Groovy language won't be allowed by defaut. Using blacklists, you can limit the features of the languages by opting
  * out, but new language features would require you to update your configuration.
- * <p/>
+ * <p>
  * If you set neither a whitelist nor a blacklist, then everything is authorized.
- * <p/>
+ * <p>
  * Combinations of import and star imports constraints are authorized as long as you use the same type of list for both.
  * For example, you may use an import whitelist and a star import whitelist together, but you cannot use an import white
  * list with a star import blacklist. static imports are handled separately, meaning that blacklisting an import <b>
  * does not</b> prevent from using a static import.
- * <p/>
- * <p/>
+ * <p>
  * Eventually, if the features provided here are not sufficient, you may implement custom AST filtering handlers, either
  * implementing the {@link StatementChecker} interface or {@link ExpressionChecker} interface then register your
  * handlers thanks to the {@link #addExpressionCheckers(org.codehaus.groovy.control.customizers.SecureASTCustomizer.ExpressionChecker...)}
  * and {@link #addStatementCheckers(org.codehaus.groovy.control.customizers.SecureASTCustomizer.StatementChecker...)}
  * methods.
- * <p/>
+ * <p>
  * Here is an example of usage. We will create a groovy classloader which only supports arithmetic operations and imports
  * the java.lang.Math classes by default.
  *
@@ -115,7 +116,6 @@ import java.util.*;
  * @author Cedric Champeau
  * @author Guillaume Laforge
  * @author Hamlet D'Arcy
- * 
  * @since 1.8.0
  */
 public class SecureASTCustomizer extends CompilationCustomizer {
@@ -458,6 +458,14 @@ public class SecureASTCustomizer extends CompilationCustomizer {
 
     /**
      * Sets the list of classes which deny method calls.
+     * 
+     * Please note that since Groovy is a dynamic language, and 
+     * this class performs a static type check, it will be reletively
+     * simple to bypass any blacklist unless the receivers blacklist contains, at
+     * a minimum, Object, Script, GroovyShell, and Eval. Additionally,
+     * it is necessary to also blacklist MethodPointerExpression in the
+     * expressions blacklist for the receivers blacklist to function
+     * as a security check.
      *
      * @param receiversBlackList the list of refused classes, as fully qualified names
      */
@@ -548,7 +556,7 @@ public class SecureASTCustomizer extends CompilationCustomizer {
             if (clNode!=classNode) {
                 checkMethodDefinitionAllowed(clNode);
                 for (MethodNode methodNode : clNode.getMethods()) {
-                    if (!methodNode.isSynthetic()) {
+                    if (!methodNode.isSynthetic() && methodNode.getCode() != null) {
                         methodNode.getCode().visit(visitor);
                     }
                 }
@@ -558,7 +566,7 @@ public class SecureASTCustomizer extends CompilationCustomizer {
         List<MethodNode> methods = filterMethods(classNode);
         if (isMethodDefinitionAllowed) {
             for (MethodNode method : methods) {
-                if (method.getDeclaringClass()==classNode) method.getCode().visit(visitor);
+                if (method.getDeclaringClass()==classNode && method.getCode() != null) method.getCode().visit(visitor);
             }
         }
     }
@@ -943,7 +951,14 @@ public class SecureASTCustomizer extends CompilationCustomizer {
 
         public void visitPropertyExpression(final PropertyExpression expression) {
             assertExpressionAuthorized(expression);
-            expression.getObjectExpression().visit(this);
+            Expression receiver = expression.getObjectExpression();
+            final String typeName = receiver.getType().getName();
+            if (receiversWhiteList != null && !receiversWhiteList.contains(typeName)) {
+                throw new SecurityException("Property access not allowed on [" + typeName + "]");
+            } else if (receiversBlackList != null && receiversBlackList.contains(typeName)) {
+                throw new SecurityException("Property access not allowed on [" + typeName + "]");
+            }
+            receiver.visit(this);
             final Expression property = expression.getProperty();
             checkConstantTypeIfNotMethodNameOrProperty(property);
         }
@@ -960,7 +975,14 @@ public class SecureASTCustomizer extends CompilationCustomizer {
 
         public void visitAttributeExpression(final AttributeExpression expression) {
             assertExpressionAuthorized(expression);
-            expression.getObjectExpression().visit(this);
+            Expression receiver = expression.getObjectExpression();
+            final String typeName = receiver.getType().getName();
+            if (receiversWhiteList != null && !receiversWhiteList.contains(typeName)) {
+                throw new SecurityException("Attribute access not allowed on [" + typeName + "]");
+            } else if (receiversBlackList != null && receiversBlackList.contains(typeName)) {
+                throw new SecurityException("Attribute access not allowed on [" + typeName + "]");
+            }
+            receiver.visit(this);
             final Expression property = expression.getProperty();
             checkConstantTypeIfNotMethodNameOrProperty(property);
         }
@@ -992,6 +1014,13 @@ public class SecureASTCustomizer extends CompilationCustomizer {
 
         public void visitVariableExpression(final VariableExpression expression) {
             assertExpressionAuthorized(expression);
+            final String type = expression.getType().getName();
+            if (constantTypesWhiteList != null && !constantTypesWhiteList.contains(type)) {
+                throw new SecurityException("Usage of variables of type [" + type + "] is not allowed");
+            }
+            if (constantTypesBlackList != null && constantTypesBlackList.contains(type)) {
+                throw new SecurityException("Usage of variables of type [" + type + "] is not allowed");
+            }
         }
 
         public void visitDeclarationExpression(final DeclarationExpression expression) {

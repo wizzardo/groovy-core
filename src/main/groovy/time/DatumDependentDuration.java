@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.time;
 
@@ -21,9 +24,9 @@ import java.util.Date;
 /**
  * DatumDependentDuration represents durations whose length in milliseconds 
  * cannot be determined without knowing the datum point.
- * <p/>
+ * <p>
  * I don't know how many days in a year unless I know if it's a leap year or not.
- * <p/>
+ * <p>
  * I don't know how many days in a month unless I know the name of the month 
  * (and if it's a leap year if the month is February)
  *
@@ -105,16 +108,12 @@ public class DatumDependentDuration extends BaseDuration {
         cal.add(Calendar.SECOND, -this.getSeconds());
         cal.add(Calendar.MILLISECOND, -this.getMillis());
 
-        //
-        // SqlDate should not really care about these values but it seems to "remember" them
-        // so we clear them. We do the adds first in case we get carry into the day field.
-        //
         cal.set(Calendar.HOUR_OF_DAY, 0);
         cal.set(Calendar.MINUTE, 0);
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
 
-        return new java.sql.Date(cal.getTimeInMillis());
+        return new Date(cal.getTimeInMillis());
     }
 
     public From getFrom() {
@@ -130,16 +129,12 @@ public class DatumDependentDuration extends BaseDuration {
                 cal.add(Calendar.SECOND, DatumDependentDuration.this.getSeconds());
                 cal.add(Calendar.MILLISECOND, DatumDependentDuration.this.getMillis());
 
-                //
-                // SqlDate should not really care about these values but it seems to "remember" them
-                // so we clear them. We do the adds first in case we get carry into the day field.
-                //
                 cal.set(Calendar.HOUR_OF_DAY, 0);
                 cal.set(Calendar.MINUTE, 0);
                 cal.set(Calendar.SECOND, 0);
                 cal.set(Calendar.MILLISECOND, 0);
 
-                return new java.sql.Date(cal.getTimeInMillis());
+                return new Date(cal.getTimeInMillis());
             }
         };
     }

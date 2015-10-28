@@ -1,20 +1,25 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.ui;
 
+import groovy.lang.Binding;
+import groovy.lang.GroovyCodeSource;
 import groovy.lang.GroovyRuntimeException;
 import groovy.lang.GroovyShell;
 import groovy.lang.GroovySystem;
@@ -22,13 +27,14 @@ import groovy.lang.MissingMethodException;
 import groovy.lang.Script;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GroovyPosixParser;
+import org.apache.commons.cli.GroovyInternalPosixParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.InvokerInvocationException;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
@@ -36,9 +42,14 @@ import org.codehaus.groovy.runtime.StackTraceUtils;
 
 import java.io.*;
 import java.math.BigInteger;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * A Command line to execute groovy.
@@ -122,6 +133,8 @@ public class GroovyMain {
         } catch (ParseException pe) {
             out.println("error: " + pe.getMessage());
             printHelp(out, options);
+        } catch (IOException ioe) {
+            out.println("error: " + ioe.getMessage());
         }
     }
 
@@ -152,7 +165,7 @@ public class GroovyMain {
      * @throws ParseException if there was a problem.
      */
     private static CommandLine parseCommandLine(Options options, String[] args) throws ParseException {
-        CommandLineParser parser = new GroovyPosixParser();
+        CommandLineParser parser = new GroovyInternalPosixParser();
         return parser.parse(options, args, true);
     }
 
@@ -236,8 +249,16 @@ public class GroovyMain {
             OptionBuilder.withLongOpt("indy")
             .withDescription("enables compilation using invokedynamic")
             .create());
-
+        options.addOption(
+            OptionBuilder.withLongOpt("configscript")
+            .hasArg().withDescription("A script for tweaking the configuration options")
+            .create());
+        options.addOption(
+                OptionBuilder.withLongOpt("basescript")
+                .hasArg().withArgName("class").withDescription("Base class name for scripts (must derive from Script)")
+                .create('b'));
         return options;
+
     }
 
     private static void setSystemPropertyFrom(final String nameValue) {
@@ -265,7 +286,7 @@ public class GroovyMain {
      * @param line the parsed command line.
      * @throws ParseException if invalid options are chosen
      */
-    private static boolean process(CommandLine line) throws ParseException {
+     private static boolean process(CommandLine line) throws ParseException, IOException {
         List args = line.getArgList();
         
         if (line.hasOption('D')) {
@@ -321,10 +342,30 @@ public class GroovyMain {
         }
         
         if (line.hasOption("indy")) {
+            CompilerConfiguration.DEFAULT.getOptimizationOptions().put("indy", true);
             main.conf.getOptimizationOptions().put("indy", true);
         }
-        
-        main.args = args;
+
+         if (line.hasOption("basescript")) {
+             main.conf.setScriptBaseClass(line.getOptionValue("basescript"));
+         }
+
+         if (line.hasOption("configscript")) {
+             String path = line.getOptionValue("configscript");
+             File groovyConfigurator = new File(path);
+             Binding binding = new Binding();
+             binding.setVariable("configuration", main.conf);
+
+             CompilerConfiguration configuratorConfig = new CompilerConfiguration();
+             ImportCustomizer customizer = new ImportCustomizer();
+             customizer.addStaticStars("org.codehaus.groovy.control.customizers.builder.CompilerCustomizationBuilder");
+             configuratorConfig.addCompilationCustomizers(customizer);
+
+             GroovyShell shell = new GroovyShell(binding, configuratorConfig);
+             shell.evaluate(groovyConfigurator);
+         }
+
+         main.args = args;
 
         return main.run();
     }
@@ -363,34 +404,68 @@ public class GroovyMain {
     /**
      * Process Sockets.
      */
-    private void processSockets() throws CompilationFailedException, IOException {
+    private void processSockets() throws CompilationFailedException, IOException, URISyntaxException {
         GroovyShell groovy = new GroovyShell(conf);
-        //check the script is currently valid before starting a server against the script
-        if (isScriptFile) {
-            groovy.parse(getText(script));
-        } else {
-            groovy.parse(script);
-        }
-        new GroovySocketServer(groovy, isScriptFile, script, autoOutput, port);
+        new GroovySocketServer(groovy, getScriptSource(isScriptFile, script), autoOutput, port);
     }
 
-    public String getText(String urlOrFilename) throws IOException {
-        if (isScriptUrl(urlOrFilename)) {
+    /**
+     * Get the text of the Groovy script at the given location.
+     * If the location is a file path and it does not exist as given,
+     * then {@link GroovyMain#huntForTheScriptFile(String)} is called to try
+     * with some Groovy extensions appended.
+     *
+     * This method is not used to process scripts and is retained for backward
+     * compatibility.  If you want to modify how GroovyMain processes scripts
+     * then use {@link GroovyMain#getScriptSource(boolean, String)}.
+     *
+     * @param uriOrFilename
+     * @return the text content at the location
+     * @throws IOException
+     * @deprecated
+     */
+    public String getText(String uriOrFilename) throws IOException {
+        if (uriPattern.matcher(uriOrFilename).matches()) {
             try {
-                return ResourceGroovyMethods.getText(new URL(urlOrFilename));
+                return ResourceGroovyMethods.getText(new URL(uriOrFilename));
             } catch (Exception e) {
                 throw new GroovyRuntimeException("Unable to get script from URL: ", e);
             }
         }
-        return ResourceGroovyMethods.getText(huntForTheScriptFile(urlOrFilename));
-    }
-
-    private boolean isScriptUrl(String urlOrFilename) {
-        return urlOrFilename.startsWith("http://") || urlOrFilename.startsWith("https://") || urlOrFilename.startsWith("file:");
+        return ResourceGroovyMethods.getText(huntForTheScriptFile(uriOrFilename));
     }
 
     /**
-     * Hunt for the script file, doesn't bother if it is named precisely.
+     * Get a new GroovyCodeSource for a script which may be given as a location
+     * (isScript is true) or as text (isScript is false).
+     *
+     * @param isScriptFile indicates whether the script parameter is a location or content
+     * @param script the location or context of the script
+     * @return a new GroovyCodeSource for the given script
+     * @throws IOException
+     * @throws URISyntaxException
+     * @since 2.3.0
+     */
+    protected GroovyCodeSource getScriptSource(boolean isScriptFile, String script) throws IOException, URISyntaxException {
+        //check the script is currently valid before starting a server against the script
+        if (isScriptFile) {
+            // search for the file and if it exists don't try to use URIs ...
+            File scriptFile = huntForTheScriptFile(script);
+            if (!scriptFile.exists() && uriPattern.matcher(script).matches()) {
+                return new GroovyCodeSource(new URI(script));
+            }
+            return new GroovyCodeSource( scriptFile );
+        }
+        return new GroovyCodeSource(script, "script_from_command_line", GroovyShell.DEFAULT_CODE_BASE);
+    }
+
+    // RFC2396
+    // scheme        = alpha *( alpha | digit | "+" | "-" | "." )
+    // match URIs but not Windows filenames, e.g.: http://cnn.com but not C:\xxx\file.ext
+    private static final Pattern uriPattern = Pattern.compile("\\p{Alpha}[-+.\\p{Alnum}]*:[^\\\\]*");
+
+    /**
+     * Search for the script file, doesn't bother if it is named precisely.
      *
      * Tries in this order:
      * - actual supplied name
@@ -398,10 +473,14 @@ public class GroovyMain {
      * - name.gvy
      * - name.gy
      * - name.gsh
+     *
+     * @since 2.3.0
      */
-    public File huntForTheScriptFile(String input) {
+    public static File searchForGroovyScriptFile(String input) {
         String scriptFileName = input.trim();
         File scriptFile = new File(scriptFileName);
+        // TODO: Shouldn't these extensions be kept elsewhere?  What about CompilerConfiguration?
+        // This method probably shouldn't be in GroovyMain either.
         String[] standardExtensions = {".groovy",".gvy",".gy",".gsh"};
         int i = 0;
         while (i < standardExtensions.length && !scriptFile.exists()) {
@@ -416,22 +495,41 @@ public class GroovyMain {
     }
 
     /**
+     * Hunt for the script file by calling searchForGroovyScriptFile(String).
+     *
+     * @see GroovyMain#searchForGroovyScriptFile(String)
+     */
+    public File huntForTheScriptFile(String input) {
+        return GroovyMain.searchForGroovyScriptFile(input);
+    }
+
+    // GROOVY-6771
+    private static void setupContextClassLoader(GroovyShell shell) {
+        final Thread current = Thread.currentThread();
+        class DoSetContext implements PrivilegedAction {
+            ClassLoader classLoader;
+
+            public DoSetContext(ClassLoader loader) {
+                classLoader = loader;
+            }
+
+            public Object run() {
+                current.setContextClassLoader(classLoader);
+                return null;
+            }
+        }
+
+        AccessController.doPrivileged(new DoSetContext(shell.getClassLoader()));
+    }
+
+    /**
      * Process the input files.
      */
-    private void processFiles() throws CompilationFailedException, IOException {
+    private void processFiles() throws CompilationFailedException, IOException, URISyntaxException {
         GroovyShell groovy = new GroovyShell(conf);
+        setupContextClassLoader(groovy);
 
-        Script s;
-
-        if (isScriptFile) {
-            if (isScriptUrl(script)) {
-                s = groovy.parse(getText(script), script.substring(script.lastIndexOf("/") + 1));
-            } else {
-                s = groovy.parse(huntForTheScriptFile(script));
-            }
-        } else {
-            s = groovy.parse(script, "main");
-        }
+        Script s = groovy.parse(getScriptSource(isScriptFile, script));
 
         if (args.isEmpty()) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
@@ -448,6 +546,8 @@ public class GroovyMain {
             Iterator i = args.iterator();
             while (i.hasNext()) {
                 String filename = (String) i.next();
+                //TODO: These are the arguments for -p and -i.  Why are we searching using Groovy script extensions?
+                // Where is this documented?
                 File file = huntForTheScriptFile(filename);
                 processFile(s, file);
             }
@@ -546,17 +646,9 @@ public class GroovyMain {
     /**
      * Process the standard, single script with args.
      */
-    private void processOnce() throws CompilationFailedException, IOException {
+    private void processOnce() throws CompilationFailedException, IOException, URISyntaxException {
         GroovyShell groovy = new GroovyShell(conf);
-
-        if (isScriptFile) {
-            if (isScriptUrl(script)) {
-                groovy.run(getText(script), script.substring(script.lastIndexOf("/") + 1), args);
-            } else {
-                groovy.run(huntForTheScriptFile(script), args);
-            }
-        } else {
-            groovy.run(script, "script_from_command_line", args);
-        }
+        setupContextClassLoader(groovy);
+        groovy.run(getScriptSource(isScriptFile, script), args);
     }
 }

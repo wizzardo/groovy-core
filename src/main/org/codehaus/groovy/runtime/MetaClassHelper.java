@@ -1,22 +1,25 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package org.codehaus.groovy.runtime;
 
 import groovy.lang.*;
+
 import org.codehaus.groovy.reflection.CachedClass;
 import org.codehaus.groovy.util.FastArray;
 import org.codehaus.groovy.reflection.ParameterTypes;
@@ -262,6 +265,7 @@ public class MetaClassHelper {
         }
         // we do not add one for super classes, only for interfaces
         int superClassMax = getMaximumInterfaceDistance(c.getSuperclass(), interfaceClass);
+        if (superClassMax != -1) superClassMax++;
         return Math.max(max, superClassMax);
     }
 
@@ -275,7 +279,10 @@ public class MetaClassHelper {
         if (parameter.getTheClass() == argument) return 0;
 
         if (parameter.isInterface()) {
-            return getMaximumInterfaceDistance(argument, parameter.getTheClass()) << INTERFACE_SHIFT;
+            int dist = getMaximumInterfaceDistance(argument, parameter.getTheClass()) << INTERFACE_SHIFT;
+            if (dist>-1 || !(argument!=null && Closure.class.isAssignableFrom(argument))) {
+                return dist;
+            } // else go to object case
         }
 
         long objectDistance = 0;
@@ -310,7 +317,7 @@ public class MetaClassHelper {
             if (clazz.isPrimitive()) {
                 objectDistance += 2;
             } else {
-                while (clazz != Object.class) {
+                while (clazz != Object.class && clazz != null) {
                     clazz = clazz.getSuperclass();
                     objectDistance += 2;
                 }
@@ -488,9 +495,12 @@ public class MetaClassHelper {
     }
 
     /**
+     * Warning: this method does not choose properly if multiple methods with
+     * the same distance are encountered
      * @param methods the methods to choose from
      * @return the method with 1 parameter which takes the most general type of
      *         object (e.g. Object) ignoring primitive types
+     * @deprecated
      */
     public static Object chooseMostGeneralMethodWith1NullParam(FastArray methods) {
         // let's look for methods with 1 argument which matches the type of the
@@ -604,13 +614,7 @@ public class MetaClassHelper {
         Class[] ans = new Class[s];
         for (int i = 0; i < s; i++) {
             Object o = args[i];
-            if (o == null) {
-                ans[i] = null;
-            } else if (o instanceof Wrapper) {
-                ans[i] = ((Wrapper) o).getType();
-            } else {
-                ans[i] = o.getClass();
-            }
+            ans[i] = getClassWithNullAndWrapper(o);
         }
         return ans;
     }
@@ -705,9 +709,11 @@ public class MetaClassHelper {
     }
 
     public static boolean isAssignableFrom(Class classToTransformTo, Class classToTransformFrom) {
-        if (classToTransformTo == classToTransformFrom) return true;
-        if (classToTransformFrom == null) return true;
-        if (classToTransformTo == Object.class) return true;
+        if (classToTransformTo == classToTransformFrom
+                || classToTransformFrom == null
+                || classToTransformTo == Object.class) {
+            return true;
+        }
 
         classToTransformTo = ReflectionCache.autoboxType(classToTransformTo);
         classToTransformFrom = ReflectionCache.autoboxType(classToTransformFrom);
@@ -715,14 +721,12 @@ public class MetaClassHelper {
 
         // note: there is no coercion for boolean and char. Range matters, precision doesn't
         if (classToTransformTo == Integer.class) {
-            if (classToTransformFrom == Integer.class
-                    || classToTransformFrom == Short.class
+            if (classToTransformFrom == Short.class
                     || classToTransformFrom == Byte.class
                     || classToTransformFrom == BigInteger.class)
                 return true;
         } else if (classToTransformTo == Double.class) {
-            if (classToTransformFrom == Double.class
-                    || classToTransformFrom == Integer.class
+            if (classToTransformFrom == Integer.class
                     || classToTransformFrom == Long.class
                     || classToTransformFrom == Short.class
                     || classToTransformFrom == Byte.class
@@ -737,36 +741,30 @@ public class MetaClassHelper {
                     || classToTransformFrom == Short.class
                     || classToTransformFrom == Byte.class
                     || classToTransformFrom == Float.class
-                    || classToTransformFrom == BigDecimal.class
                     || classToTransformFrom == BigInteger.class)
                 return true;
         } else if (classToTransformTo == BigInteger.class) {
             if (classToTransformFrom == Integer.class
                     || classToTransformFrom == Long.class
                     || classToTransformFrom == Short.class
-                    || classToTransformFrom == Byte.class
-                    || classToTransformFrom == BigInteger.class)
+                    || classToTransformFrom == Byte.class)
                 return true;
         } else if (classToTransformTo == Long.class) {
-            if (classToTransformFrom == Long.class
-                    || classToTransformFrom == Integer.class
+            if (classToTransformFrom == Integer.class
                     || classToTransformFrom == Short.class
                     || classToTransformFrom == Byte.class)
                 return true;
         } else if (classToTransformTo == Float.class) {
-            if (classToTransformFrom == Float.class
-                    || classToTransformFrom == Integer.class
+            if (classToTransformFrom == Integer.class
                     || classToTransformFrom == Long.class
                     || classToTransformFrom == Short.class
                     || classToTransformFrom == Byte.class)
                 return true;
         } else if (classToTransformTo == Short.class) {
-            if (classToTransformFrom == Short.class
-                    || classToTransformFrom == Byte.class)
+            if (classToTransformFrom == Byte.class)
                 return true;
         } else if (classToTransformTo == String.class) {
-            if (classToTransformFrom == String.class ||
-                    GString.class.isAssignableFrom(classToTransformFrom)) {
+            if (GString.class.isAssignableFrom(classToTransformFrom)) {
                 return true;
             }
         }
@@ -800,7 +798,7 @@ public class MetaClassHelper {
         String logname = "methodCalls." + className + "." + methodName;
         Logger objLog = Logger.getLogger(logname);
         if (!objLog.isLoggable(Level.FINER)) return;
-        StringBuffer msg = new StringBuffer(methodName);
+        StringBuilder msg = new StringBuilder(methodName);
         msg.append("(");
         if (arguments != null) {
             for (int i = 0; i < arguments.length;) {
@@ -870,17 +868,20 @@ public class MetaClassHelper {
 
         for (int i = params.length - 1; i >= 0; i--) {
             Object arg = arguments[i];
-            if (arg == null) {
-                if (!weakNullCheck)
-                    return false;
-            } else {
-                if (params[i] != arg.getClass()
-                        && (!(arg instanceof Wrapper) || params[i] != ((Wrapper) arg).getType()))
-                    return false;
-            }
+            Class compareClass = getClassWithNullAndWrapper(arg);
+            if (params[i] != compareClass) return false;
         }
 
         return true;
+    }
+
+    private static Class getClassWithNullAndWrapper(Object arg) {
+        if (arg == null) return null;
+        if (arg instanceof Wrapper) {
+            Wrapper w = (Wrapper) arg;
+            return w.getType();
+        }
+        return arg.getClass();
     }
 
     public static boolean sameClasses(Class[] params, Object[] arguments) {
@@ -893,7 +894,7 @@ public class MetaClassHelper {
                 if (params[i] != null)
                     return false;
             } else {
-                if (params[i] != arg.getClass() && !(arg instanceof Wrapper && params[i] == ((Wrapper) arg).getType()))
+                if (params[i] != getClassWithNullAndWrapper(arg))
                     return false;
             }
         }
@@ -912,11 +913,7 @@ public class MetaClassHelper {
         if (params.length != 1)
             return false;
 
-        if (arg1 == null
-                || (params[0] != arg1.getClass()
-                && (!(arg1 instanceof Wrapper)
-                || params[0] != ((Wrapper) arg1).getType())))
-            return false;
+        if (params[0] != getClassWithNullAndWrapper(arg1)) return false;
 
         return true;
     }
@@ -925,17 +922,8 @@ public class MetaClassHelper {
         if (params.length != 2)
             return false;
 
-        if (arg1 == null
-                || (params[0] != arg1.getClass()
-                && (!(arg1 instanceof Wrapper)
-                || params[0] != ((Wrapper) arg1).getType())))
-            return false;
-
-        if (arg2 == null
-                || (params[1] != arg2.getClass()
-                && (!(arg2 instanceof Wrapper)
-                || params[1] != ((Wrapper) arg2).getType())))
-            return false;
+        if (params[0] != getClassWithNullAndWrapper(arg1)) return false;
+        if (params[1] != getClassWithNullAndWrapper(arg2)) return false;
 
         return true;
     }
@@ -944,23 +932,9 @@ public class MetaClassHelper {
         if (params.length != 3)
             return false;
 
-        if (arg1 == null
-                || (params[0] != arg1.getClass()
-                && (!(arg1 instanceof Wrapper)
-                || params[0] != ((Wrapper) arg1).getType())))
-            return false;
-
-        if (arg2 == null
-                || (params[1] != arg2.getClass()
-                && (!(arg2 instanceof Wrapper)
-                || params[1] != ((Wrapper) arg2).getType())))
-            return false;
-
-        if (arg3 == null
-                || (params[2] != arg3.getClass()
-                && (!(arg3 instanceof Wrapper)
-                || params[2] != ((Wrapper) arg3).getType())))
-            return false;
+        if (params[0] != getClassWithNullAndWrapper(arg1)) return false;
+        if (params[1] != getClassWithNullAndWrapper(arg2)) return false;
+        if (params[2] != getClassWithNullAndWrapper(arg3)) return false;
 
         return true;
     }
@@ -969,38 +943,16 @@ public class MetaClassHelper {
         if (params.length != 4)
             return false;
 
-        if (arg1 == null
-                || (params[0] != arg1.getClass()
-                && (!(arg1 instanceof Wrapper)
-                || params[0] != ((Wrapper) arg1).getType())))
-            return false;
-
-        if (arg2 == null
-                || (params[1] != arg2.getClass()
-                && (!(arg2 instanceof Wrapper)
-                || params[1] != ((Wrapper) arg2).getType())))
-            return false;
-
-        if (arg3 == null
-                || (params[2] != arg3.getClass()
-                && (!(arg3 instanceof Wrapper)
-                || params[2] != ((Wrapper) arg3).getType())))
-            return false;
-
-        if (arg4 == null
-                || (params[3] != arg4.getClass()
-                && (!(arg4 instanceof Wrapper)
-                || params[3] != ((Wrapper) arg4).getType())))
-            return false;
-
+        if (params[0] != getClassWithNullAndWrapper(arg1)) return false;
+        if (params[1] != getClassWithNullAndWrapper(arg2)) return false;
+        if (params[2] != getClassWithNullAndWrapper(arg3)) return false;
+        if (params[3] != getClassWithNullAndWrapper(arg4)) return false;
+        
         return true;
     }
 
     public static boolean sameClass(Class[] params, Object arg) {
-        return !(arg == null
-                || (params[0] != arg.getClass()
-                && (!(arg instanceof Wrapper)
-                || params[0] != ((Wrapper) arg).getType())));
+        return params[0] == getClassWithNullAndWrapper(arg);
 
     }
 
@@ -1050,5 +1002,18 @@ public class MetaClassHelper {
         } else {
             DefaultGroovyMethods.setMetaClass(self, mc);
         }
+    }
+
+    /**
+     * Converts a String into a standard property name.
+     *
+     * @param prop the original name
+     * @return the converted name
+     */
+    public static String convertPropertyName(String prop) {
+        if (Character.isDigit(prop.charAt(0))) {
+            return prop;
+        }
+        return java.beans.Introspector.decapitalize(prop);
     }
 }

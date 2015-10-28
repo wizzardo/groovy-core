@@ -1,27 +1,31 @@
 /*
- * Copyright 2008-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.transform
 
 /**
  * @author Paul King
+ * @author Tim Yates
  */
 class ImmutableTransformTest extends GroovyShellTestCase {
 
     void testImmutable() {
-        def objects = evaluate("""
+        def objects = evaluate('''
             import groovy.transform.Immutable
             enum Coin { HEAD, TAIL }
             @Immutable class Bar {
@@ -31,11 +35,11 @@ class ImmutableTransformTest extends GroovyShellTestCase {
             }
             [new Bar(x:'x', y:'y', c:Coin.HEAD, nums:[1,2]),
              new Bar('x', 'y', Coin.HEAD, [1,2])]
-        """)
+        ''')
 
-        assertEquals objects[0].hashCode(), objects[1].hashCode()
-        assertEquals objects[0], objects[1]
-        assertTrue objects[0].nums.class.name.contains("Unmodifiable")
+        assert objects[0].hashCode() == objects[1].hashCode()
+        assert objects[0] == objects[1]
+        assert objects[0].nums.class.name.contains("Unmodifiable")
     }
 
     void testImmutableClonesListAndCollectionFields() {
@@ -217,6 +221,28 @@ class ImmutableTransformTest extends GroovyShellTestCase {
         """
     }
 
+    void testDefaultValuesAreImmutable_groovy6293() {
+        assertScript """
+            import groovy.transform.Immutable
+            @Immutable class Y { Collection c = []; int foo = 1 }
+            def y = new Y(foo: 3)
+            assert y.c.class.name.contains('Unmodifiable')
+            assert y.c == []
+            assert y.foo == 3
+        """
+    }
+
+    void testNoArgConstructor_groovy6473() {
+        assertScript """
+            import groovy.transform.Immutable
+            @Immutable class Y { Collection c = []; int foo = 1 }
+            def y = new Y()
+            assert y.c.class.name.contains('Unmodifiable')
+            assert y.c == []
+            assert y.foo == 1
+        """
+    }
+
     void testImmutableEquals() {
         assertScript """
             import groovy.transform.Immutable
@@ -343,11 +369,12 @@ class ImmutableTransformTest extends GroovyShellTestCase {
                 String name
                 Date dob
                 Color favColor
+                Class helperType
             }
 
-            def p = new Person(id: UUID.randomUUID(), name: 'Fred', dob: new Date(), favColor: Color.GREEN)
-            def propClasses = [p.id, p.name, p.dob, p.favColor]*.class.name
-            assert propClasses == ['java.util.UUID', 'java.lang.String', 'java.util.Date', 'java.awt.Color']
+            def p = new Person(id: UUID.randomUUID(), name: 'Fred', dob: new Date(), favColor: Color.GREEN, helperType: StringBuffer)
+            def propClasses = [p.id, p.name, p.dob, p.favColor, p.helperType]*.class.name
+            assert propClasses == ['java.util.UUID', 'java.lang.String', 'java.util.Date', 'java.awt.Color', 'java.lang.Class']
         '''
     }
 
@@ -509,6 +536,21 @@ class ImmutableTransformTest extends GroovyShellTestCase {
         '''
     }
 
+    void testKnownImmutableClassesWithCoercedConstruction() {
+        assertScript '''
+            @groovy.transform.Immutable(knownImmutableClasses = [Address])
+            class Person {
+                String first, last
+                Address address
+            }
+
+            // ok, not really immutable but deem it such for the purpose of this test
+            @groovy.transform.Canonical class Address { String street }
+
+            assert new Person(first: 'John', last: 'Doe', address: ['Street']).toString() == 'Person(John, Doe, Address(Street))\'
+        '''
+    }
+
     void testKnownImmutableClassesMissing() {
         def msg = shouldFail(RuntimeException) {
             evaluate '''
@@ -541,5 +583,337 @@ class ImmutableTransformTest extends GroovyShellTestCase {
             def items = new Items(['Fee', 'Fi', 'Fo', 'Fum'])
             assert !items.list.class.name.contains('Unmodifiable')
         '''
+    }
+
+    // GROOVY-5828
+    void testKnownImmutables() {
+        assertScript '''
+            // ok, Items not really immutable but pretend so for the purpose of this test
+            @groovy.transform.Immutable(knownImmutables = ['list1'])
+            class Items {
+                List list1
+                List list2
+            }
+            def items = new Items(['Fee', 'Fi'], ['Fo', 'Fum'])
+            assert !items.list1.class.name.contains('Unmodifiable')
+            assert items.list2.class.name.contains('Unmodifiable')
+        '''
+    }
+
+    // GROOVY-5449
+    void testShouldNotThrowNPE() {
+        def msg = shouldFail(RuntimeException) {
+            evaluate '''
+            @groovy.transform.Immutable
+            class Person {
+                def name
+            }
+            '''
+        }
+        assert msg.contains('@Immutable processor doesn\'t know how to handle field \'name\' of type \'java.lang.Object or def\'')
+    }
+
+    // GROOVY-6192
+    void testWithEqualsAndHashCodeASTOverride() {
+        assertScript '''
+            import groovy.transform.*
+
+            @Immutable
+            @EqualsAndHashCode(includes = ['id'])
+            class B {
+                String id
+                String name
+            }
+
+            assert new B('1', 'foo').equals(new B('1', 'foo2'))
+        '''
+    }
+
+    // GROOVY-6354
+    public void testCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |class Person {
+            |    String first, last
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( first:'tim' )
+        assert tim.is( tim2 )
+
+        // This should also be the same instance and no changes
+        def tim3 = tim.copyWith( first:'tim', whatever:true )
+        assert tim.is( tim3 )
+
+        // As should this
+        def tim4 = tim.copyWith( whatever:true )
+        assert tim.is( tim4 )
+
+        // And this
+        def tim5 = tim.copyWith()
+        assert tim.is( tim5 )
+
+        // This should be a new instance with a new firstname
+        def alice = tim.copyWith( first:'alice' )
+        assert tim != alice
+        assert alice.first == 'alice'
+        assert !alice.is( tim )
+    }
+
+    public void testGenericsCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |class Person {
+            |    List<String> names
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( [ 'Tim', 'Yates' ] )
+        assert tim.names == [ 'Tim', 'Yates' ]
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( names:[ 'Tim', 'Yates' ] )
+        assert tim.is( tim2 )
+
+        // This should be a new instance
+        def alice = tim.copyWith( names:[ 'Alice', 'Yates' ] )
+        assert tim != alice
+        assert alice.names == [ 'Alice', 'Yates' ]
+        assert !alice.is( tim )
+    }
+
+    public void testWithPrivatesCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith=true)
+            |class Foo {
+            |  String first
+            |  String last
+            |  private String cache
+            |  List<String> nicknames
+            |  def full() {
+            |    if (!cache) cache = "$first $last (${nicknames.join(', ')})"
+            |    cache
+            |  }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( 'Tim', 'Yates', [ 'tim', 'nick1' ] )
+        assert tim.full() == 'Tim Yates (tim, nick1)'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( nicknames:[ 'tim', 'nick1' ] )
+        assert tim.is( tim2 )
+
+        // This should be a new instance
+        def alice = tim.copyWith( first:'Alice', nicknames:[ 'ali' ] )
+        assert tim != alice
+        assert !alice.is( tim )
+        assert alice.full() == 'Alice Yates (ali)'
+    }
+
+    public void testStaticWithPrivatesCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith=true)
+            |@groovy.transform.CompileStatic
+            |class Foo {
+            |  String first
+            |  String last
+            |  private String cache
+            |  List<String> nicknames
+            |  def full() {
+            |    if (!cache) cache = "$first $last (${nicknames.join(', ')})"
+            |    cache
+            |  }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( 'Tim', 'Yates', [ 'tim', 'nick1' ] )
+        assert tim.full() == 'Tim Yates (tim, nick1)'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( nicknames:[ 'tim', 'nick1' ] )
+        assert tim.is( tim2 )
+
+        // This should be a new instance
+        def alice = tim.copyWith( first:'Alice', nicknames:[ 'ali' ] )
+        assert tim != alice
+        assert !alice.is( tim )
+        assert alice.full() == 'Alice Yates (ali)'
+    }
+
+    public void testTypedWithPrivatesCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith=true)
+            |@groovy.transform.TypeChecked
+            |class Foo {
+            |  String first
+            |  String last
+            |  private String cache
+            |  List<String> nicknames
+            |  def full() {
+            |    if (!cache) cache = "$first $last (${nicknames.join(', ')})"
+            |    cache
+            |  }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( 'Tim', 'Yates', [ 'tim', 'nick1' ] )
+        assert tim.full() == 'Tim Yates (tim, nick1)'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( nicknames:[ 'tim', 'nick1' ] )
+        assert tim.is( tim2 )
+
+        // This should be a new instance
+        def alice = tim.copyWith( first:'Alice', nicknames:[ 'ali' ] )
+        assert tim != alice
+        assert !alice.is( tim )
+        assert alice.full() == 'Alice Yates (ali)'
+    }
+
+    public void testStaticCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |@groovy.transform.CompileStatic
+            |class Person {
+            |    String first, last
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( first:'tim' )
+        assert tim.is( tim2 )
+
+        // This should also be the same instance and no changes
+        def tim3 = tim.copyWith( first:'tim', whatever:true )
+        assert tim.is( tim3 )
+
+        // As should this
+        def tim4 = tim.copyWith( whatever:true )
+        assert tim.is( tim4 )
+
+        // And this
+        def tim5 = tim.copyWith()
+        assert tim.is( tim5 )
+
+        // This should be a new instance with a new firstname
+        def alice = tim.copyWith( first:'alice' )
+        assert tim != alice
+        assert alice.first == 'alice'
+        assert !alice.is( tim )
+    }
+
+    public void testTypedCopyWith() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |@groovy.transform.TypeChecked
+            |class Person {
+            |    String first, last
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // This should be the same instance and no changes
+        def tim2 = tim.copyWith( first:'tim' )
+        assert tim.is( tim2 )
+
+        // This should also be the same instance and no changes
+        def tim3 = tim.copyWith( first:'tim', whatever:true )
+        assert tim.is( tim3 )
+
+        // As should this
+        def tim4 = tim.copyWith( whatever:true )
+        assert tim.is( tim4 )
+
+        // And this
+        def tim5 = tim.copyWith()
+        assert tim.is( tim5 )
+
+        // This should be a new instance with a new firstname
+        def alice = tim.copyWith( first:'alice' )
+        assert tim != alice
+        assert alice.first == 'alice'
+        assert !alice.is( tim )
+    }
+
+    public void testCopyWithSkipping() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |class Person {
+            |    String first, last
+            |    List<Person> copyWith( i ) {
+            |        (1..i).collect { this }
+            |    }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // Check original copyWith remains
+        def result = tim.copyWith( 2 )
+        assert result.size() == 2
+        assert result.first == [ 'tim', 'tim' ]
+    }
+
+    public void testStaticCopyWithSkipping() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |@groovy.transform.CompileStatic
+            |class Person {
+            |    String first, last
+            |    List<Person> copyWith( i ) {
+            |        (1..i).collect { this }
+            |    }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // Check original copyWith remains
+        def result = tim.copyWith( 2 )
+        assert result.size() == 2
+        assert result.first == [ 'tim', 'tim' ]
+    }
+
+    public void testTypedCopyWithSkipping() {
+        def tester = new GroovyClassLoader().parseClass(
+                '''@groovy.transform.Immutable(copyWith = true)
+            |@groovy.transform.TypeChecked
+            |class Person {
+            |    String first, last
+            |    List<Person> copyWith( i ) {
+            |        (1..i).collect { this }
+            |    }
+            |}
+            |'''.stripMargin() )
+
+        // One instance
+        def tim = tester.newInstance( first:'tim', last:'yates' )
+        assert tim.first == 'tim'
+
+        // Check original copyWith remains
+        def result = tim.copyWith( 2 )
+        assert result.size() == 2
+        assert result.first == [ 'tim', 'tim' ]
     }
 }

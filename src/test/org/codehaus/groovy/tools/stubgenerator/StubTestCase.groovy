@@ -1,17 +1,20 @@
 /*
- * Copyright 2003-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools.stubgenerator
 
@@ -30,26 +33,23 @@ import org.codehaus.groovy.control.CompilationFailedException
  *
  * If you want to create a new test, you have to create a class extending <code>StubTestCase</code>.
  * Your subclass has to implement <code>void verifyStubs()</code>.
- * <p/>
- *
+ * <p>
  * All the sample Java and Groovy sources to be joint-compiled must be either:
  * <ul>
  * <li>put in <code>src/test-resources/stubgenerator</code>,
  * under a directory whose name is the name of the subclass you created, with the first letter lowercase,
  * and the suffix Test removed.
  * Example: for the test <code>CircularLanguageReferenceTest</code>,
- * you should put your resources in <code>src/test-resources/stubgenerator/circularLanguageReference</code>.
+ * you should put your resources in <code>src/test-resources/stubgenerator/circularLanguageReference</code>.</li>
  * <li>provided via the <code>Map<String, String> provideSources()</code> method. Example: see one of the
- * existing tests which use this approach, e.g. <code>DuplicateMethodAdditionInStubsTest</code>.
+ * existing tests which use this approach, e.g. <code>DuplicateMethodAdditionInStubsTest</code>.</li>
  * </ul>
- *
  * From within the <code>verifyStubs()</code> method, you can make various assertions on the stubs.
  * QDox is used for parsing the Java sources (both the generated stub Java sources, as well as the original Java source,
  * but not the Groovy sources).
  * The execution of the <code>verifyStubs()</code> method is done with the <code>QDoxCategory</code> applied,
  * which provides various useful shortcuts for quickly checking the structure of your stubs.
- * <p/>
- *
+ * <p>
  * Please have a look at the existing samples to see what kind of asserts can be done.
  *
  * @author Guillaume Laforge
@@ -63,6 +63,7 @@ abstract class StubTestCase extends GroovyTestCase {
 
     protected JavaDocBuilder qdox = new JavaDocBuilder()
 
+    protected GroovyClassLoader loader
     protected CompilerConfiguration config = new CompilerConfiguration()
 
     protected boolean debug = false;
@@ -94,6 +95,8 @@ abstract class StubTestCase extends GroovyTestCase {
             targetDir.deleteDir()
             stubDir.deleteDir()
         }
+        loader = null
+        config = null
         super.tearDown()
     }
 
@@ -182,6 +185,9 @@ abstract class StubTestCase extends GroovyTestCase {
             use (QDoxCategory) {
                 verifyStubs()
             }
+            if (sourceRootPath.getAbsolutePath() =~ 'stubgentests') {
+                sourceRootPath.deleteDir()
+            }
         }
 
     }
@@ -209,7 +215,7 @@ abstract class StubTestCase extends GroovyTestCase {
      * @param sources the sources to be compiled
      */
     protected void compile(List<File> sources) {
-        def loader = new GroovyClassLoader(this.class.classLoader)
+        loader = new GroovyClassLoader(this.class.classLoader)
         def cu = new JavaAwareCompilationUnit(config, loader)
         cu.addSources(sources as File[])
         try {
@@ -278,14 +284,7 @@ abstract class StubTestCase extends GroovyTestCase {
      * @throws IOException if a temporary directory could not be created
      */
     protected static File createTempDirectory() throws IOException {
-        File tempDirectory = File.createTempFile("stubgentests", Long.toString(System.currentTimeMillis()))
-        if (!(tempDirectory.delete())) {
-            throw new IOException("Impossible to delete temporary file: ${tempDirectory.absolutePath}")
-        }
-        if (!(tempDirectory.mkdir())) {
-            throw new IOException("Impossible to create temporary directory: ${tempDirectory.absolutePath}")
-        }
-        return tempDirectory
+        File.createTempDir("stubgentests", Long.toString(System.currentTimeMillis()))
     }
 
     /**

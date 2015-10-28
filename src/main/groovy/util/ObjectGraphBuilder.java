@@ -1,19 +1,21 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.util;
 
 import groovy.lang.Closure;
@@ -38,7 +40,7 @@ import org.codehaus.groovy.runtime.InvokerHelper;
  * any) at the same time.
  *
  * @author Scott Vlaminck (http://refactr.com)
- * @author Andres Almiray <aalmiray@users.sourceforge.com>
+ * @author <a href="mailto:aalmiray@users.sourceforge.com">Andres Almiray</a>
  */
 public class ObjectGraphBuilder extends FactoryBuilderSupport {
     public static final String NODE_CLASS = "_NODE_CLASS_";
@@ -482,11 +484,11 @@ public class ObjectGraphBuilder extends FactoryBuilderSupport {
     }
 
     /**
-     * Default impl that returns parentName &amp; childName accordingly.
+     * Default impl that returns parentName and childName accordingly.
      */
     public static class DefaultRelationNameResolver implements RelationNameResolver {
         /**
-         * Handles the common English regular plurals with the following rules.<br />
+         * Handles the common English regular plurals with the following rules.
          * <ul>
          * <li>If childName ends in {consonant}y, replace 'y' with "ies". For example, allergy to allergies.</li>
          * <li>Otherwise, append 's'. For example, monkey to monkeys; employee to employees.</li>
@@ -833,7 +835,7 @@ public class ObjectGraphBuilder extends FactoryBuilderSupport {
         }
     }
 
-    private static class NodeReference {
+    private static final class NodeReference {
         private final Object parent;
         private final String parentName;
         private final String childName;

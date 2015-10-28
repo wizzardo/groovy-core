@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.sql;
 
@@ -38,7 +41,8 @@ import javax.sql.DataSource;
 
 import groovy.lang.Tuple;
 import org.codehaus.groovy.runtime.InvokerHelper;
-import org.codehaus.groovy.runtime.SqlGroovyMethods;
+
+import static org.codehaus.groovy.runtime.SqlGroovyMethods.toRowResult;
 
 /**
  * A facade over Java's normal JDBC APIs providing greatly simplified
@@ -138,7 +142,7 @@ import org.codehaus.groovy.runtime.SqlGroovyMethods;
  * strictly speaking the final <code>close()</code> method isn't required - as all connection
  * handling is performed transparently on our behalf; however, it doesn't hurt to
  * have it there as it will return silently in that case.
- * <p/>
+ * <p>
  * If instead of <code>newInstance</code> you use <code>withInstance</code>, then
  * <code>close()</code> will be called automatically for you.
  *
@@ -161,13 +165,13 @@ import org.codehaus.groovy.runtime.SqlGroovyMethods;
  * <h4>Named and named ordinal parameters</h4>
  *
  * Several of the methods in this class (ones which have a String-based sql query and params in
- * a List<Object> or Object[] or Map) support <em>named</em> or <em>named ordinal</em> parameters.
+ * a List&lt;Object&gt; or Object[] or Map) support <em>named</em> or <em>named ordinal</em> parameters.
  * These methods are useful for queries with large numbers of parameters - though the GString
  * variations are often preferred in such cases too. Reminder: when you see a variant with Object[] as
  * the type of the last parameter, Groovy allows vararg style parameters so you don't explicitly need to
  * create an Object[] and if the first parameter is of type Map, Groovy supports named arguments - examples
  * of both are contained in the examples below.
- * <p/>
+ * <p>
  * Named parameter queries use placeholder values in the query String. Two forms are supported
  * ':propname1' and '?.propname2'. For these variations, a single <em>model</em> object is
  * supplied in the parameter list/array/map. The propname refers to a property of that model object.
@@ -209,7 +213,7 @@ import org.codehaus.groovy.runtime.SqlGroovyMethods;
  * <h4>More details</h4>
  *
  * See the method and constructor JavaDoc for more details.
- * <p/>
+ * <p>
  * For advanced usage, the class provides numerous extension points for overriding the
  * facade behavior associated with the various aspects of managing
  * the interaction with the underlying database.
@@ -232,8 +236,7 @@ public class Sql {
     protected static final Logger LOG = Logger.getLogger(Sql.class.getName());
 
     private static final List<Object> EMPTY_LIST = Collections.emptyList();
-
-    private static final Pattern NAMED_QUERY_PATTERN = Pattern.compile("(?<!:)(:)(\\w+)|\\?(\\d*)(?:\\.(\\w+))?");
+    private static final int USE_COLUMN_NAMES = -1;
 
     private DataSource dataSource;
 
@@ -262,6 +265,7 @@ public class Sql {
     private final Map<String, Statement> statementCache = new HashMap<String, Statement>();
     private final Map<String, String> namedParamSqlCache = new HashMap<String, String>();
     private final Map<String, List<Tuple>> namedParamIndexPropCache = new HashMap<String, List<Tuple>>();
+    private List<String> keyColumnNames;
 
     /**
      * Creates a new Sql instance given a JDBC connection URL.
@@ -524,7 +528,7 @@ public class Sql {
      * Of these, '<code>url</code>' is required. Others may be needed depending on your database.<br>
      * If '<code>properties</code>' is supplied, neither '<code>user</code>' nor '<code>password</code>' should be supplied.<br>
      * If one of '<code>user</code>' or '<code>password</code>' is supplied, both should be supplied.
-     *<p/>
+     *<p>
      * Example usage:
      * <pre>
      * import groovy.sql.Sql
@@ -778,6 +782,10 @@ public class Sql {
     public static InParameter VARBINARY(Object value) { return in(Types.VARBINARY, value); }
     public static InParameter VARCHAR(Object value) { return in(Types.VARCHAR, value); }
 
+    public static final int NO_RESULT_SETS = 0;
+    public static final int FIRST_RESULT_SET = 1;
+    public static final int ALL_RESULT_SETS = 2;
+
     /**
      * Create a new InParameter
      *
@@ -846,7 +854,7 @@ public class Sql {
     /**
      * When using GString SQL queries, allows a variable to be expanded
      * in the Sql string rather than representing an sql parameter.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def fieldName = 'firstname'
@@ -920,7 +928,7 @@ public class Sql {
      * Performs the given SQL query, which should return a single
      * <code>ResultSet</code> object. The given closure is called
      * with the <code>ResultSet</code> as its argument.
-     * <p/>
+     * <p>
      * Example usages:
      * <pre>
      * sql.query("select * from PERSON where firstname like 'S%'") { ResultSet rs ->
@@ -931,7 +939,7 @@ public class Sql {
      *     while (rs.next()) println rs.toRowResult().firstname
      * }
      * </pre>
-     * <p/>
+     * <p>
      * All resources including the ResultSet are closed automatically
      * after the closure is called.
      *
@@ -959,17 +967,17 @@ public class Sql {
      * <code>ResultSet</code> object. The given closure is called
      * with the <code>ResultSet</code> as its argument.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * sql.query('select * from PERSON where lastname like ?', ['%a%']) { ResultSet rs ->
      *     while (rs.next()) println rs.getString('lastname')
      * }
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters.
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * All resources including the ResultSet are closed automatically
      * after the closure is called.
      *
@@ -1033,7 +1041,7 @@ public class Sql {
      * <code>ResultSet</code> object. The given closure is called
      * with the <code>ResultSet</code> as its argument.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
@@ -1041,7 +1049,7 @@ public class Sql {
      *     while (rs.next()) println rs.getString('firstname')
      * }
      * </pre>
-     * <p/>
+     * <p>
      * All resources including the ResultSet are closed automatically
      * after the closure is called.
      *
@@ -1060,7 +1068,7 @@ public class Sql {
      * Performs the given SQL query calling the given Closure with each row of the result set.
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
-     * <p/>
+     * <p>
      * Example usages:
      * <pre>
      * sql.eachRow("select * from PERSON where firstname like 'S%'") { row ->
@@ -1071,7 +1079,7 @@ public class Sql {
      *     println it.firstname
      * }
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the sql statement
@@ -1087,16 +1095,16 @@ public class Sql {
      * the provided <code>offset</code>, and including up to <code>maxRows</code> number of rows.
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the sql statement
@@ -1116,7 +1124,7 @@ public class Sql {
      * that supports accessing the fields using property style notation and ordinal index values.
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def printColNames = { meta ->
@@ -1131,7 +1139,7 @@ public class Sql {
      * }
      * sql.eachRow("select * from PERSON", printColNames, printRow)
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the sql statement
@@ -1148,19 +1156,19 @@ public class Sql {
      * the provided <code>offset</code>, and including up to <code>maxRows</code> number of rows.
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
-     * <p/>
+     * <p>
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the sql statement
@@ -1182,7 +1190,7 @@ public class Sql {
 
             GroovyResultSet groovyRS = new GroovyResultSetProxy(results).getImpl();
             int i = 0;
-            while (groovyRS.next() && (maxRows <= 0 || i++ < maxRows)) {
+            while ((maxRows <= 0 || i++ < maxRows) && groovyRS.next()) {
                 rowClosure.call(groovyRS);
             }
         } catch (SQLException e) {
@@ -1211,16 +1219,16 @@ public class Sql {
      * the provided <code>offset</code>, and including up to <code>maxRows</code> number of rows.
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
-     * <p/>
+     * <p>
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
@@ -1246,7 +1254,7 @@ public class Sql {
 
             GroovyResultSet groovyRS = new GroovyResultSetProxy(results).getImpl();
             int i = 0;
-            while (groovyRS.next() && (maxRows <= 0 || i++ < maxRows)) {
+            while ((maxRows <= 0 || i++ < maxRows) && groovyRS.next()) {
                 rowClosure.call(groovyRS);
             }
         } catch (SQLException e) {
@@ -1298,7 +1306,7 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def printColNames = { meta ->
@@ -1313,10 +1321,10 @@ public class Sql {
      * }
      * sql.eachRow("select * from PERSON where lastname like ?", ['%a%'], printColNames, printRow)
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters.
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the sql statement
@@ -1364,14 +1372,14 @@ public class Sql {
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * sql.eachRow("select * from PERSON where lastname like ?", ['%a%']) { row ->
      *     println "${row[1]} $row.lastname"
      * }
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the sql statement
@@ -1417,12 +1425,12 @@ public class Sql {
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
@@ -1474,11 +1482,11 @@ public class Sql {
      * Performs the given SQL query calling the given Closure with each row of the result set.
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
-     * <p/>
+     * <p>
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
@@ -1494,7 +1502,7 @@ public class Sql {
      * }
      * sql.eachRow("select * from PERSON where location_id < $location", printColNames, printRow)
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring     a GString containing the SQL query with embedded params
@@ -1517,12 +1525,12 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
@@ -1546,12 +1554,12 @@ public class Sql {
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
@@ -1573,7 +1581,7 @@ public class Sql {
      * The row will be a <code>GroovyResultSet</code> which is a <code>ResultSet</code>
      * that supports accessing the fields using property style notation and ordinal index values.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
@@ -1581,7 +1589,7 @@ public class Sql {
      *     println row.firstname
      * }
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -1595,13 +1603,13 @@ public class Sql {
 
     /**
      * Performs the given SQL query and return the rows of the result set.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def ans = sql.rows("select * from PERSON where firstname like 'S%'")
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql the SQL statement
@@ -1615,16 +1623,16 @@ public class Sql {
     /**
      * Performs the given SQL query and return a "page" of rows from the result set.  A page is defined as starting at
      * a 1-based offset, and containing a maximum number of rows.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the SQL statement
@@ -1642,14 +1650,14 @@ public class Sql {
      * Performs the given SQL query and return the rows of the result set.
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def printNumCols = { meta -> println "Found $meta.columnCount columns" }
      * def ans = sql.rows("select * from PERSON", printNumCols)
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the SQL statement
@@ -1666,16 +1674,16 @@ public class Sql {
      * a 1-based offset, and containing a maximum number of rows.
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the SQL statement
@@ -1687,6 +1695,8 @@ public class Sql {
      */
     public List<GroovyRowResult> rows(String sql, int offset, int maxRows, Closure metaClosure) throws SQLException {
         AbstractQueryCommand command = createQueryCommand(sql);
+        // for efficiency set maxRows (adjusted for the first offset rows we are going to skip the cursor over)
+        command.setMaxRows(offset + maxRows);
         ResultSet rs = null;
         try {
             rs = command.execute();
@@ -1701,16 +1711,16 @@ public class Sql {
     /**
      * Performs the given SQL query and return the rows of the result set.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def ans = sql.rows("select * from PERSON where lastname like ?", ['%a%'])
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> list. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    the SQL statement
@@ -1740,19 +1750,19 @@ public class Sql {
      * Performs the given SQL query and return a "page" of rows from the result set.  A page is defined as starting at
      * a 1-based offset, and containing a maximum number of rows.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> list. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the SQL statement
@@ -1800,10 +1810,10 @@ public class Sql {
 
     /**
      * Performs the given SQL query and return the rows of the result set.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> array. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #rows(String, List)}.
      *
      * @param sql    the SQL statement
@@ -1818,10 +1828,10 @@ public class Sql {
 
     /**
      * Performs the given SQL query and return the rows of the result set.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> array. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #rows(String, List, int, int)}.
      *
      * @param sql     the SQL statement
@@ -1840,14 +1850,14 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def printNumCols = { meta -> println "Found $meta.columnCount columns" }
      * def ans = sql.rows("select * from PERSON where lastname like ?", ['%a%'], printNumCols)
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> list. Here is an example:
      * <pre>
@@ -1864,7 +1874,7 @@ public class Sql {
      * println "Found ${ans2.size()} rows"
      * </pre>
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the SQL statement
@@ -1914,19 +1924,19 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> list. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql         the SQL statement
@@ -1941,6 +1951,8 @@ public class Sql {
             throws SQLException {
 
         AbstractQueryCommand command = createPreparedQueryCommand(sql, params);
+        // for efficiency set maxRows (adjusted for the first offset rows we are going to skip the cursor over)
+        command.setMaxRows(offset + maxRows);
         try {
             return asList(sql, command.execute(), offset, maxRows, metaClosure);
         } finally {
@@ -1986,16 +1998,16 @@ public class Sql {
      * Performs the given SQL query and return a "page" of rows from the result set.  A page is defined as starting at
      * a 1-based offset, and containing a maximum number of rows.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the SQL statement
@@ -2011,14 +2023,14 @@ public class Sql {
     /**
      * Performs the given SQL query and return the rows of the result set.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
      * def ans = sql.rows("select * from PERSON where location_id < $location")
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2035,7 +2047,7 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
@@ -2043,7 +2055,7 @@ public class Sql {
      * def ans = sql.rows("select * from PERSON where location_id < $location", printNumCols)
      * println "Found ${ans.size()} rows"
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring     a GString containing the SQL query with embedded params
@@ -2065,16 +2077,16 @@ public class Sql {
      * In addition, the <code>metaClosure</code> will be called once passing in the
      * <code>ResultSetMetaData</code> as argument.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Note that the underlying implementation is based on either invoking <code>ResultSet.absolute()</code>,
      * or if the ResultSet type is <code>ResultSet.TYPE_FORWARD_ONLY</code>, the <code>ResultSet.next()</code> method
      * is invoked equivalently.  The first row of a ResultSet is 1, so passing in an offset of 1 or less has no effect
      * on the initial positioning within the result set.
-     * <p/>
+     * <p>
      * Note that different database and JDBC driver implementations may work differently with respect to this method.
      * Specifically, one should expect that <code>ResultSet.TYPE_FORWARD_ONLY</code> may be less efficient than a
      * "scrollable" type.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring     the SQL statement
@@ -2090,16 +2102,15 @@ public class Sql {
         return rows(sql, params, offset, maxRows, metaClosure);
     }
 
-
     /**
      * Performs the given SQL query and return the first row of the result set.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def ans = sql.firstRow("select * from PERSON where firstname like 'S%'")
      * println ans.firstname
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql the SQL statement
@@ -2107,23 +2118,30 @@ public class Sql {
      * @throws SQLException if a database access error occurs
      */
     public GroovyRowResult firstRow(String sql) throws SQLException {
-        List<GroovyRowResult> rows = rows(sql);
+        List<GroovyRowResult> rows = null;
+        try {
+            rows = rows(sql, 1, 1, null);
+        }
+        //should be SQLFeatureNotSupportedException instead once we move to Java 1.6
+        catch (SQLException featureNotSupportedException) {
+            rows = rows(sql);
+        }
         if (rows.isEmpty()) return null;
-        return (rows.get(0));
+        return rows.get(0);
     }
 
     /**
      * Performs the given SQL query and return
      * the first row of the result set.
      * The query may contain GString expressions.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def location = 25
      * def ans = sql.firstRow("select * from PERSON where location_id < $location")
      * println ans.firstname
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2140,7 +2158,7 @@ public class Sql {
     /**
      * Performs the given SQL query and return the first row of the result set.
      * The query may contain placeholder question marks which match the given list of parameters.
-     * <p/>
+     * <p>
      * Example usages:
      * <pre>
      * def ans = sql.firstRow("select * from PERSON where lastname like ?", ['%a%'])
@@ -2160,10 +2178,10 @@ public class Sql {
      *
      * assert sql.firstRow("{call FullName(?)}", ['Sam'])[0] == 'Sam Pullara'
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> list. See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    the SQL statement
@@ -2172,7 +2190,14 @@ public class Sql {
      * @throws SQLException if a database access error occurs
      */
     public GroovyRowResult firstRow(String sql, List<Object> params) throws SQLException {
-        List<GroovyRowResult> rows = rows(sql, params);
+        List<GroovyRowResult> rows = null;
+        try {
+            rows = rows(sql, params, 1, 1, null);
+        }
+        //should be SQLFeatureNotSupportedException instead once we move to Java 1.6
+        catch (SQLException featureNotSupportedException) {
+            rows = rows(sql, params);
+        }
         if (rows.isEmpty()) return null;
         return rows.get(0);
     }
@@ -2193,9 +2218,9 @@ public class Sql {
 
     /**
      * Performs the given SQL query and return the first row of the result set.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #firstRow(String, List)}.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> array. See the class Javadoc for more details.
      *
@@ -2211,7 +2236,7 @@ public class Sql {
     /**
      * Executes the given piece of SQL.
      * Also saves the updateCount, if any, for subsequent examination.
-     * <p/>
+     * <p>
      * Example usages:
      * <pre>
      * sql.execute "DROP TABLE IF EXISTS person"
@@ -2230,7 +2255,7 @@ public class Sql {
      * """
      * assert sql.updateCount == 1
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql the SQL to execute
@@ -2244,7 +2269,6 @@ public class Sql {
         Statement statement = null;
         try {
             statement = getStatement(connection, sql);
-            // TODO handle multiple results
             boolean isResultSet = statement.execute(sql);
             this.updateCount = statement.getUpdateCount();
             return isResultSet;
@@ -2257,9 +2281,64 @@ public class Sql {
     }
 
     /**
+     * Executes the given piece of SQL.
+     * Also calls the provided processResults Closure to process any ResultSet or UpdateCount results that executing the SQL might produce.
+     * <p>
+     * Example usages:
+     * <pre>
+     * boolean first = true
+     * sql.execute "{call FindAllByFirst('J')}", { isResultSet, result ->
+     *   if (first) {
+     *     first = false
+     *     assert !isResultSet && result == 0
+     *   } else {
+     *     assert isResultSet && result == [[ID:1, FIRSTNAME:'James', LASTNAME:'Strachan'], [ID:4, FIRSTNAME:'Jean', LASTNAME:'Gabin']]
+     *   }
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql the SQL to execute
+     * @param processResults a Closure which will be passed two parameters: either {@code true} plus a list of GroovyRowResult values
+     *                       derived from {@code statement.getResultSet()} or {@code false} plus the update count from {@code statement.getUpdateCount()}.
+     *                       The closure will be called for each result produced from executing the SQL.
+     * @throws SQLException if a database access error occurs
+     * @since 2.3.2
+     */
+    public void execute(String sql, Closure processResults) throws SQLException {
+        Connection connection = createConnection();
+        Statement statement = null;
+        try {
+            statement = getStatement(connection, sql);
+            boolean isResultSet = statement.execute(sql);
+            int updateCount = statement.getUpdateCount();
+            while(isResultSet || updateCount != -1) {
+                if (processResults.getMaximumNumberOfParameters() != 2) {
+                    throw new SQLException("Incorrect number of parameters for processResults Closure");
+                }
+                if (isResultSet) {
+                    ResultSet resultSet = statement.getResultSet();
+                    List<GroovyRowResult> rowResult = resultSet == null ? null : asList(sql, resultSet);
+                    processResults.call(isResultSet, rowResult);
+                } else {
+                    processResults.call(isResultSet, updateCount);
+                }
+                isResultSet = statement.getMoreResults();
+                updateCount = statement.getUpdateCount();
+            }
+        } catch (SQLException e) {
+            LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
+            throw e;
+        } finally {
+            closeResources(connection, statement);
+        }
+    }
+
+    /**
      * Executes the given piece of SQL with parameters.
      * Also saves the updateCount, if any, for subsequent examination.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * sql.execute """
@@ -2267,10 +2346,10 @@ public class Sql {
      * """, [1, "Guillaume", "Laforge", 10]
      * assert sql.updateCount == 1
      * </pre>
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters.
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    the SQL statement
@@ -2285,10 +2364,56 @@ public class Sql {
         PreparedStatement statement = null;
         try {
             statement = getPreparedStatement(connection, sql, params);
-            // TODO handle multiple results
             boolean isResultSet = statement.execute();
             this.updateCount = statement.getUpdateCount();
             return isResultSet;
+        } catch (SQLException e) {
+            LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
+            throw e;
+        } finally {
+            closeResources(connection, statement);
+        }
+    }
+
+    /**
+     * Executes the given piece of SQL with parameters.
+     * Also calls the provided processResults Closure to process any ResultSet or UpdateCount results that executing the SQL might produce.
+     * <p>
+     * This method supports named and named ordinal parameters.
+     * See the class Javadoc for more details.
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql    the SQL statement
+     * @param params a list of parameters
+     * @param processResults a Closure which will be passed two parameters: either {@code true} plus a list of GroovyRowResult values
+     *                       derived from {@code statement.getResultSet()} or {@code false} plus the update count from {@code statement.getUpdateCount()}.
+     *                       The closure will be called for each result produced from executing the SQL.
+     * @throws SQLException if a database access error occurs
+     * @see #execute(String, Closure)
+     * @since 2.3.2
+     */
+    public void execute(String sql, List<Object> params, Closure processResults) throws SQLException {
+        Connection connection = createConnection();
+        PreparedStatement statement = null;
+        try {
+            statement = getPreparedStatement(connection, sql, params);
+            boolean isResultSet = statement.execute();
+            int updateCount = statement.getUpdateCount();
+            while(isResultSet || updateCount != -1) {
+                if (processResults.getMaximumNumberOfParameters() != 2) {
+                    throw new SQLException("Incorrect number of parameters for processResults Closure");
+                }
+                if (isResultSet) {
+                    ResultSet resultSet = statement.getResultSet();
+                    List<GroovyRowResult> rowResult = resultSet == null ? null : asList(sql, resultSet);
+                    processResults.call(isResultSet, rowResult);
+                } else {
+                    processResults.call(isResultSet, updateCount);
+                }
+                isResultSet = statement.getMoreResults();
+                updateCount = statement.getUpdateCount();
+            }
         } catch (SQLException e) {
             LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
             throw e;
@@ -2314,10 +2439,26 @@ public class Sql {
     }
 
     /**
+     * A variant of {@link #execute(String, java.util.List, Closure)}
+     * useful when providing the named parameters as named arguments.
+     *
+     * @param params a map containing the named parameters
+     * @param sql    the SQL statement
+     * @param processResults a Closure which will be passed two parameters: either {@code true} plus a list of GroovyRowResult values
+     *                       derived from {@code statement.getResultSet()} or {@code false} plus the update count from {@code statement.getUpdateCount()}.
+     *                       The closure will be called for each result produced from executing the SQL.
+     * @throws SQLException if a database access error occurs
+     * @since 2.3.2
+     */
+    public void execute(Map params, String sql, Closure processResults) throws SQLException {
+        execute(sql, singletonList(params), processResults);
+    }
+
+    /**
      * Executes the given piece of SQL with parameters.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #execute(String, List)}.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> array. See the class Javadoc for more details.
      *
@@ -2333,9 +2474,30 @@ public class Sql {
     }
 
     /**
+     * Executes the given piece of SQL with parameters.
+     * <p>
+     * An Object array variant of {@link #execute(String, List, Closure)}.
+     * <p>
+     * This method supports named and named ordinal parameters by supplying such
+     * parameters in the <code>params</code> array. See the class Javadoc for more details.
+     *
+     * @param sql    the SQL statement
+     * @param params an array of parameters
+     * @param processResults a Closure which will be passed two parameters: either {@code true} plus a list of GroovyRowResult values
+     *                       derived from {@code statement.getResultSet()} or {@code false} plus the update count from {@code statement.getUpdateCount()}.
+     *                       The closure will be called for each result produced from executing the SQL.
+     * @throws SQLException if a database access error occurs
+     * @see #execute(String, List, Closure)
+     * @since 2.3.2
+     */
+    public void execute(String sql, Object[] params, Closure processResults) throws SQLException {
+        execute(sql, Arrays.asList(params), processResults);
+    }
+
+    /**
      * Executes the given SQL with embedded expressions inside.
      * Also saves the updateCount, if any, for subsequent examination.
-     * <p/>
+     * <p>
      * Example usage:
      * <pre>
      * def scott = [firstname: "Scott", lastname: "Davis", id: 5, location_id: 50]
@@ -2344,7 +2506,7 @@ public class Sql {
      * """
      * assert sql.updateCount == 1
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2361,11 +2523,31 @@ public class Sql {
     }
 
     /**
+     * Executes the given SQL with embedded expressions inside.
+     * Also calls the provided processResults Closure to process any ResultSet or UpdateCount results that executing the SQL might produce.
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param gstring a GString containing the SQL query with embedded params
+     * @param processResults a Closure which will be passed two parameters: either {@code true} plus a list of GroovyRowResult values
+     *                       derived from {@code statement.getResultSet()} or {@code false} plus the update count from {@code statement.getUpdateCount()}.
+     *                       The closure will be called for each result produced from executing the SQL.
+     * @throws SQLException if a database access error occurs
+     * @see #expand(Object)
+     * @see #execute(String, List, Closure)
+     * @since 2.3.2
+     */
+    public void execute(GString gstring, Closure processResults) throws SQLException {
+        List<Object> params = getParameters(gstring);
+        String sql = asSql(gstring, params);
+        execute(sql, params, processResults);
+    }
+
+    /**
      * Executes the given SQL statement (typically an INSERT statement).
      * Use this variant when you want to receive the values of any
      * auto-generated columns, such as an autoincrement ID field.
      * See {@link #executeInsert(GString)} for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql The SQL statement to execute
@@ -2395,10 +2577,10 @@ public class Sql {
      * auto-generated columns, such as an autoincrement ID field.
      * The query may contain placeholder question marks which match the given list of parameters.
      * See {@link #executeInsert(GString)} for more details.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters.
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    The SQL statement to execute
@@ -2425,7 +2607,47 @@ public class Sql {
     }
 
     /**
-     * A variant of {@link #firstRow(String, java.util.List)}
+     * Executes the given SQL statement (typically an INSERT statement).
+     * Use this variant when you want to receive the values of any auto-generated columns,
+     * such as an autoincrement ID field (or fields) and you know the column name(s) of the ID field(s).
+     * The query may contain placeholder question marks which match the given list of parameters.
+     * See {@link #executeInsert(GString)} for more details.
+     * <p>
+     * This method supports named and named ordinal parameters.
+     * See the class Javadoc for more details.
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql            The SQL statement to execute
+     * @param params         The parameter values that will be substituted
+     *                       into the SQL statement's parameter slots
+     * @param keyColumnNames a list of column names indicating the columns that should be returned from the
+     *                       inserted row or rows (some drivers may be case sensitive, e.g. may require uppercase names)
+     * @return A list of the auto-generated row results for each inserted row (typically auto-generated keys)
+     * @throws SQLException if a database access error occurs
+     * @see Connection#prepareStatement(String, String[])
+     * @since 2.3.2
+     */
+    public List<GroovyRowResult> executeInsert(String sql, List<Object> params, List<String> keyColumnNames) throws SQLException {
+        Connection connection = createConnection();
+        PreparedStatement statement = null;
+        try {
+            this.keyColumnNames = keyColumnNames;
+            statement = getPreparedStatement(connection, sql, params, USE_COLUMN_NAMES);
+            this.keyColumnNames = null;
+            this.updateCount = statement.executeUpdate();
+            ResultSet keys = statement.getGeneratedKeys();
+            return asList(sql, keys);
+        } catch (SQLException e) {
+            LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
+            throw e;
+        } finally {
+            closeResources(connection, statement);
+        }
+    }
+
+    /**
+     * A variant of {@link #executeInsert(String, java.util.List)}
      * useful when providing the named parameters as named arguments.
      *
      * @param params a map containing the named parameters
@@ -2440,10 +2662,29 @@ public class Sql {
     }
 
     /**
+     * A variant of {@link #executeInsert(String, List, List)}
+     * useful when providing the named parameters as named arguments.
+     * This variant allows you to receive the values of any auto-generated columns,
+     * such as an autoincrement ID field (or fields) when you know the column name(s) of the ID field(s).
+     *
+     * @param params         a map containing the named parameters
+     * @param sql            The SQL statement to execute
+     * @param keyColumnNames a list of column names indicating the columns that should be returned from the
+     *                       inserted row or rows (some drivers may be case sensitive, e.g. may require uppercase names)
+     * @return A list of the auto-generated row results for each inserted row (typically auto-generated keys)
+     * @throws SQLException if a database access error occurs
+     * @see Connection#prepareStatement(String, String[])
+     * @since 2.3.2
+     */
+    public List<GroovyRowResult> executeInsert(Map params, String sql, List<String> keyColumnNames) throws SQLException {
+        return executeInsert(sql, singletonList(params), keyColumnNames);
+    }
+
+    /**
      * Executes the given SQL statement (typically an INSERT statement).
-     * <p/>
+     * <p>
      * An Object array variant of {@link #executeInsert(String, List)}.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters by supplying such
      * parameters in the <code>params</code> array. See the class Javadoc for more details.
      *
@@ -2459,39 +2700,92 @@ public class Sql {
     }
 
     /**
-     * <p>Executes the given SQL statement (typically an INSERT statement).
+     * Executes the given SQL statement (typically an INSERT statement).
+     * This variant allows you to receive the values of any auto-generated columns,
+     * such as an autoincrement ID field (or fields) when you know the column name(s) of the ID field(s).
+     * <p>
+     * This method supports named and named ordinal parameters by supplying such
+     * parameters in the <code>params</code> array. See the class Javadoc for more details.
+     *
+     * @param sql            The SQL statement to execute
+     * @param keyColumnNames an array of column names indicating the columns that should be returned from the
+     *                       inserted row or rows (some drivers may be case sensitive, e.g. may require uppercase names)
+     * @return A list of the auto-generated row results for each inserted row (typically auto-generated keys)
+     * @throws SQLException if a database access error occurs
+     * @since 2.3.2
+     */
+    public List<GroovyRowResult> executeInsert(String sql, String[] keyColumnNames) throws SQLException {
+        Connection connection = createConnection();
+        Statement statement = null;
+        try {
+            statement = getStatement(connection, sql);
+            this.updateCount = statement.executeUpdate(sql, keyColumnNames);
+            ResultSet keys = statement.getGeneratedKeys();
+            return asList(sql, keys);
+        } catch (SQLException e) {
+            LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
+            throw e;
+        } finally {
+            closeResources(connection, statement);
+        }
+    }
+
+    /**
+     * Executes the given SQL statement (typically an INSERT statement).
+     * This variant allows you to receive the values of any auto-generated columns,
+     * such as an autoincrement ID field (or fields) when you know the column name(s) of the ID field(s).
+     * <p>
+     * An array variant of {@link #executeInsert(String, List, List)}.
+     * <p>
+     * This method supports named and named ordinal parameters by supplying such
+     * parameters in the <code>params</code> array. See the class Javadoc for more details.
+     *
+     * @param sql            The SQL statement to execute
+     * @param keyColumnNames an array of column names indicating the columns that should be returned from the
+     *                       inserted row or rows (some drivers may be case sensitive, e.g. may require uppercase names)
+     * @param params         The parameter values that will be substituted
+     *                       into the SQL statement's parameter slots
+     * @return A list of the auto-generated row results for each inserted row (typically auto-generated keys)
+     * @throws SQLException if a database access error occurs
+     * @since 2.3.2
+     */
+    public List<GroovyRowResult> executeInsert(String sql, String[] keyColumnNames, Object[] params) throws SQLException {
+        return executeInsert(sql, Arrays.asList(params), Arrays.asList(keyColumnNames));
+    }
+
+    /**
+     * Executes the given SQL statement (typically an INSERT statement).
      * Use this variant when you want to receive the values of any
      * auto-generated columns, such as an autoincrement ID field.
-     * The query may contain GString expressions.</p>
-     * <p/>
-     * <p>Generated key values can be accessed using
+     * The query may contain GString expressions.
+     * <p>
+     * Generated key values can be accessed using
      * array notation. For example, to return the second auto-generated
      * column value of the third row, use <code>keys[3][1]</code>. The
      * method is designed to be used with SQL INSERT statements, but is
-     * not limited to them.</p>
-     * <p/>
-     * <p>The standard use for this method is when a table has an
+     * not limited to them.
+     * <p>
+     * The standard use for this method is when a table has an
      * autoincrement ID column and you want to know what the ID is for
      * a newly inserted row. In this example, we insert a single row
-     * into a table in which the first column contains the autoincrement
-     * ID:</p>
+     * into a table in which the first column contains the autoincrement ID:
      * <pre>
-     *     def sql = Sql.newInstance("jdbc:mysql://localhost:3306/groovy",
-     *                               "user",
-     *                               "password",
-     *                               "com.mysql.jdbc.Driver")
+     * def sql = Sql.newInstance("jdbc:mysql://localhost:3306/groovy",
+     *                           "user",
+     *                           "password",
+     *                           "com.mysql.jdbc.Driver")
      *
-     *     def keys = sql.executeInsert("insert into test_table (INT_DATA, STRING_DATA) "
-     *                           + "VALUES (1, 'Key Largo')")
+     * def keys = sql.executeInsert("insert into test_table (INT_DATA, STRING_DATA) "
+     *                       + "VALUES (1, 'Key Largo')")
      *
-     *     def id = keys[0][0]
+     * def id = keys[0][0]
      *
-     *     // 'id' now contains the value of the new row's ID column.
-     *     // It can be used to update an object representation's
-     *     // id attribute for example.
-     *     ...
+     * // 'id' now contains the value of the new row's ID column.
+     * // It can be used to update an object representation's
+     * // id attribute for example.
+     * ...
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2507,8 +2801,30 @@ public class Sql {
     }
 
     /**
+     * Executes the given SQL statement (typically an INSERT statement).
+     * Use this variant when you want to receive the values of any auto-generated columns,
+     * such as an autoincrement ID field (or fields) and you know the column name(s) of the ID field(s).
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param gstring        a GString containing the SQL query with embedded params
+     * @param keyColumnNames a list of column names indicating the columns that should be returned from the
+     *                       inserted row or rows (some drivers may be case sensitive, e.g. may require uppercase names)
+     * @return A list of the auto-generated row results for each inserted row (typically auto-generated keys)
+     * @throws SQLException if a database access error occurs
+     * @see Connection#prepareStatement(String, String[])
+     * @see #expand(Object)
+     * @since 2.3.2
+     */
+    public List<GroovyRowResult> executeInsert(GString gstring, List<String> keyColumnNames) throws SQLException {
+        List<Object> params = getParameters(gstring);
+        String sql = asSql(gstring, params);
+        return executeInsert(sql, params, keyColumnNames);
+    }
+
+    /**
      * Executes the given SQL update.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql the SQL to execute
@@ -2532,10 +2848,10 @@ public class Sql {
 
     /**
      * Executes the given SQL update with parameters.
-     * <p/>
+     * <p>
      * This method supports named and named ordinal parameters.
      * See the class Javadoc for more details.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    the SQL statement
@@ -2574,7 +2890,7 @@ public class Sql {
 
     /**
      * Executes the given SQL update with parameters.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #executeUpdate(String, List)}.
      *
      * @param sql    the SQL statement
@@ -2588,7 +2904,7 @@ public class Sql {
 
     /**
      * Executes the given SQL update with embedded expressions inside.
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2604,7 +2920,7 @@ public class Sql {
 
     /**
      * Performs a stored procedure call.
-     * <p/>
+     * <p>
      * Example usage (tested with MySQL) - suppose we have the following stored procedure:
      * <pre>
      * sql.execute """
@@ -2639,7 +2955,7 @@ public class Sql {
 
     /**
      * Performs a stored procedure call with the given embedded parameters.
-     * <p/>
+     * <p>
      * Example usage - see {@link #call(String)} for more details about
      * creating a <code>HouseSwap(IN name1, IN name2)</code> stored procedure.
      * Once created, it can be called like this:
@@ -2649,7 +2965,7 @@ public class Sql {
      * def rowsChanged = sql.call("{call HouseSwap($p1, $p2)}")
      * assert rowsChanged == 2
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param gstring a GString containing the SQL query with embedded params
@@ -2666,7 +2982,7 @@ public class Sql {
 
     /**
      * Performs a stored procedure call with the given parameters.
-     * <p/>
+     * <p>
      * Example usage - see {@link #call(String)} for more details about
      * creating a <code>HouseSwap(IN name1, IN name2)</code> stored procedure.
      * Once created, it can be called like this:
@@ -2674,7 +2990,7 @@ public class Sql {
      * def rowsChanged = sql.call("{call HouseSwap(?, ?)}", ['Guillaume', 'Paul'])
      * assert rowsChanged == 2
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql    the SQL statement
@@ -2701,7 +3017,7 @@ public class Sql {
 
     /**
      * Performs a stored procedure call with the given parameters.
-     * <p/>
+     * <p>
      * An Object array variant of {@link #call(String, List)}.
      *
      * @param sql    the SQL statement
@@ -2717,7 +3033,7 @@ public class Sql {
     /**
      * Performs a stored procedure call with the given parameters.  The closure
      * is called once with all the out parameters.
-     * <p/>
+     * <p>
      * Example usage - suppose we create a stored procedure (ignore its simplistic implementation):
      * <pre>
      * // Tested with MySql 5.0.75
@@ -2745,7 +3061,7 @@ public class Sql {
      * }
      * </pre>
      * which will output '<code>Northern Hemisphere</code>'.
-     * <p/>
+     * <p>
      * We can also access stored functions with scalar return values where the return value
      * will be treated as an OUT parameter. Here are examples for various databases for
      * creating such a procedure:
@@ -2786,7 +3102,7 @@ public class Sql {
      *     assert name == 'Sam Pullara'
      * }
      * </pre>
-     * <p/>
+     * <p>
      * Resource handling is performed automatically where appropriate.
      *
      * @param sql     the sql statement
@@ -2795,14 +3111,197 @@ public class Sql {
      * @throws SQLException if a database access error occurs
      */
     public void call(String sql, List<Object> params, Closure closure) throws Exception {
+        callWithRows(sql, params, NO_RESULT_SETS, closure);
+    }
+
+    /**
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects.
+     * <p>
+     * See {@link #call(String, List, Closure)} for more details about
+     * creating a <code>Hemisphere(IN first, IN last, OUT dwells)</code> stored procedure.
+     * Once created, it can be called like this:
+     * <pre>
+     * def first = 'Scott'
+     * def last = 'Davis'
+     * sql.call "{call Hemisphere($first, $last, ${Sql.VARCHAR})}", { dwells ->
+     *     println dwells
+     * }
+     * </pre>
+     * <p>
+     * As another example, see {@link #call(String, List, Closure)} for more details about
+     * creating a <code>FullName(IN first)</code> stored function.
+     * Once created, it can be called like this:
+     * <pre>
+     * def first = 'Sam'
+     * sql.call("{$Sql.VARCHAR = call FullName($first)}") { name ->
+     *     assert name == 'Sam Pullara'
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param gstring a GString containing the SQL query with embedded params
+     * @param closure called for each row with a GroovyResultSet
+     * @throws SQLException if a database access error occurs
+     * @see #call(String, List, Closure)
+     * @see #expand(Object)
+     */
+    public void call(GString gstring, Closure closure) throws Exception {
+        List<Object> params = getParameters(gstring);
+        String sql = asSql(gstring, params);
+        call(sql, params, closure);
+    }
+
+    /**
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects,
+     * and also returning the rows of the ResultSet.
+     * <p>
+     * Use this when calling a stored procedure that utilizes both
+     * output parameters and returns a single ResultSet.
+     * <p>
+     * Once created, the stored procedure can be called like this:
+     * <pre>
+     * def first = 'Jeff'
+     * def last = 'Sheets'
+     * def rows = sql.callWithRows "{call Hemisphere2($first, $last, ${Sql.VARCHAR})}", { dwells ->
+     *     println dwells
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param gstring a GString containing the SQL query with embedded params
+     * @param closure called once with all out parameter results
+     * @return a list of GroovyRowResult objects
+     * @throws SQLException if a database access error occurs
+     * @see #callWithRows(String, List, Closure)
+     */
+    public List<GroovyRowResult> callWithRows(GString gstring, Closure closure) throws SQLException {
+        List<Object> params = getParameters(gstring);
+        String sql = asSql(gstring, params);
+        return callWithRows(sql, params, closure);
+    }
+
+    /**
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects,
+     * and also returning the rows of the ResultSet.
+     * <p>
+     * Use this when calling a stored procedure that utilizes both
+     * output parameters and returns a single ResultSet.
+     * <p>
+     * Once created, the stored procedure can be called like this:
+     * <pre>
+     * def rows = sql.callWithRows '{call Hemisphere2(?, ?, ?)}', ['Guillaume', 'Laforge', Sql.VARCHAR], { dwells ->
+     *     println dwells
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql     the sql statement
+     * @param params  a list of parameters
+     * @param closure called once with all out parameter results
+     * @return a list of GroovyRowResult objects
+     * @throws SQLException if a database access error occurs
+     * @see #callWithRows(GString, Closure)
+     */
+    public List<GroovyRowResult> callWithRows(String sql, List<Object> params, Closure closure) throws SQLException {
+        return callWithRows(sql, params, FIRST_RESULT_SET, closure).get(0);
+    }
+
+    /**
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects,
+     * and also returning a list of lists with the rows of the ResultSet(s).
+     * <p>
+     * Use this when calling a stored procedure that utilizes both
+     * output parameters and returns multiple ResultSets.
+     * <p>
+     * Once created, the stored procedure can be called like this:
+     * <pre>
+     * def first = 'Jeff'
+     * def last = 'Sheets'
+     * def rowsList = sql.callWithAllRows "{call Hemisphere2($first, $last, ${Sql.VARCHAR})}", { dwells ->
+     *     println dwells
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param gstring a GString containing the SQL query with embedded params
+     * @param closure called once with all out parameter results
+     * @return a list containing lists of GroovyRowResult objects
+     * @throws SQLException if a database access error occurs
+     * @see #callWithAllRows(String, List, Closure)
+     */
+    public List<List<GroovyRowResult>> callWithAllRows(GString gstring, Closure closure) throws SQLException {
+        List<Object> params = getParameters(gstring);
+        String sql = asSql(gstring, params);
+        return callWithAllRows(sql, params, closure);
+    }
+
+    /**
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects,
+     * and also returning a list of lists with the rows of the ResultSet(s).
+     * <p>
+     * Use this when calling a stored procedure that utilizes both
+     * output parameters and returns multiple ResultSets.
+     * <p>
+     * Once created, the stored procedure can be called like this:
+     * <pre>
+     * def rowsList = sql.callWithAllRows '{call Hemisphere2(?, ?, ?)}', ['Guillaume', 'Laforge', Sql.VARCHAR], { dwells ->
+     *     println dwells
+     * }
+     * </pre>
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql     the sql statement
+     * @param params  a list of parameters
+     * @param closure called once with all out parameter results
+     * @return a list containing lists of GroovyRowResult objects
+     * @throws SQLException if a database access error occurs
+     * @see #callWithRows(GString, Closure)
+     */
+    public List<List<GroovyRowResult>> callWithAllRows(String sql, List<Object> params, Closure closure) throws SQLException {
+        return callWithRows(sql, params, ALL_RESULT_SETS, closure);
+    }
+
+    /**
+     * Base internal method for call(), callWithRows(), and callWithAllRows() style of methods.
+     * <p>
+     * Performs a stored procedure call with the given parameters,
+     * calling the closure once with all result objects,
+     * and also returning the rows of the ResultSet(s) (if processResultSets is set to
+     * Sql.FIRST_RESULT_SET, Sql.ALL_RESULT_SETS)
+     * <p>
+     * Main purpose of processResultSets param is to retain original call() method
+     * performance when this is set to Sql.NO_RESULT_SETS
+     * <p>
+     * Resource handling is performed automatically where appropriate.
+     *
+     * @param sql     the sql statement
+     * @param params  a list of parameters
+     * @param processResultsSets the result sets to process, either Sql.NO_RESULT_SETS, Sql.FIRST_RESULT_SET, or Sql.ALL_RESULT_SETS
+     * @param closure called once with all out parameter results
+     * @return a list of GroovyRowResult objects
+     * @throws SQLException if a database access error occurs
+     * @see #callWithRows(String, List, Closure)
+     */
+    protected List<List<GroovyRowResult>> callWithRows(String sql, List<Object> params, int processResultsSets, Closure closure) throws SQLException {
         Connection connection = createConnection();
-        CallableStatement statement = connection.prepareCall(sql);
+        CallableStatement statement = null;
         List<GroovyResultSet> resultSetResources = new ArrayList<GroovyResultSet>();
         try {
+            statement = connection.prepareCall(sql);
+
             LOG.fine(sql + " | " + params);
             setParameters(params, statement);
-            // TODO handle multiple results and mechanism for retrieving ResultSet if any (GROOVY-3048)
-            statement.execute();
+            boolean hasResultSet = statement.execute();
             List<Object> results = new ArrayList<Object>();
             int indx = 0;
             int inouts = 0;
@@ -2827,54 +3326,33 @@ public class Sql {
                 indx++;
             }
             closure.call(results.toArray(new Object[inouts]));
+            List<List<GroovyRowResult>> resultSets = new ArrayList<List<GroovyRowResult>>();
+            if (processResultsSets == NO_RESULT_SETS) {
+                resultSets.add(new ArrayList<GroovyRowResult>());
+                return resultSets;
+            }
+            //Check both hasResultSet and getMoreResults() because of differences in vendor behavior
+            if (!hasResultSet) {
+                hasResultSet = statement.getMoreResults();
+            }
+            while (hasResultSet && (processResultsSets != NO_RESULT_SETS)) {
+                resultSets.add(asList(sql, statement.getResultSet()));
+                if (processResultsSets == FIRST_RESULT_SET) {
+                    break;
+                } else {
+                    hasResultSet = statement.getMoreResults();
+                }
+            }
+            return resultSets;
         } catch (SQLException e) {
             LOG.warning("Failed to execute: " + sql + " because: " + e.getMessage());
             throw e;
         } finally {
-            closeResources(connection, statement);
             for (GroovyResultSet rs : resultSetResources) {
                 closeResources(null, null, rs);
             }
+            closeResources(connection, statement);
         }
-    }
-
-    /**
-     * Performs a stored procedure call with the given parameters,
-     * calling the closure once with all result objects.
-     * <p/>
-     * See {@link #call(String, List, Closure)} for more details about
-     * creating a <code>Hemisphere(IN first, IN last, OUT dwells)</code> stored procedure.
-     * Once created, it can be called like this:
-     * <pre>
-     * def first = 'Scott'
-     * def last = 'Davis'
-     * sql.call "{call Hemisphere($first, $last, ${Sql.VARCHAR})}", { dwells ->
-     *     println dwells
-     * }
-     * </pre>
-     * <p/>
-     * As another example, see {@link #call(String, List, Closure)} for more details about
-     * creating a <code>FullName(IN first)</code> stored function.
-     * Once created, it can be called like this:
-     * <pre>
-     * def first = 'Sam'
-     * sql.call("{$Sql.VARCHAR = call FullName($first)}") { name ->
-     *     assert name == 'Sam Pullara'
-     * }
-     * </pre>
-     * <p/>
-     * Resource handling is performed automatically where appropriate.
-     *
-     * @param gstring a GString containing the SQL query with embedded params
-     * @param closure called for each row with a GroovyResultSet
-     * @throws SQLException if a database access error occurs
-     * @see #call(String, List, Closure)
-     * @see #expand(Object)
-     */
-    public void call(GString gstring, Closure closure) throws Exception {
-        List<Object> params = getParameters(gstring);
-        String sql = asSql(gstring, params);
-        call(sql, params, closure);
     }
 
     /**
@@ -2981,8 +3459,8 @@ public class Sql {
     }
 
     /**
-     * Enables statement caching.</br>
-     * if <i>cacheStatements</i> is true, cache is created and all created prepared statements will be cached.</br>
+     * Enables statement caching.<br>
+     * if <i>cacheStatements</i> is true, cache is created and all created prepared statements will be cached.
      * if <i>cacheStatements</i> is false, all cached statements will be properly closed.
      *
      * @param cacheStatements the new value
@@ -3054,8 +3532,18 @@ public class Sql {
         } catch (Error e) {
             handleError(connection, e);
             throw e;
+        } catch (Exception e) {
+            handleError(connection, e);
+            throw new SQLException("Unexpected exception during transaction", e);
         } finally {
-            if (connection != null) connection.setAutoCommit(savedAutoCommit);
+            if (connection != null) {
+                try {
+                    connection.setAutoCommit(savedAutoCommit);
+                }
+                catch (SQLException e) {
+                    LOG.finest("Caught exception resetting auto commit: " + e.getMessage() + " - continuing");
+                }
+            }
             cacheConnection = false;
             closeResources(connection, null);
             cacheConnection = savedCacheConnection;
@@ -3078,15 +3566,15 @@ public class Sql {
     /**
      * Performs the closure (containing batch operations) within a batch.
      * Uses a batch size of zero, i.e. no automatic partitioning of batches.
-     * <p/>
+     * <p>
      * This means that <code>executeBatch()</code> will be called automatically after the <code>withBatch</code>
      * closure has finished but may be called explicitly if desired as well for more fine-grained
      * partitioning of the batch.
-     * <p/>
+     * <p>
      * The closure will be called with a single argument; the database
      * statement (actually a <code>BatchingStatementWrapper</code> helper object)
      * associated with this batch.
-     * <p/>
+     * <p>
      * Use it like this:
      * <pre>
      * def updateCounts = sql.withBatch { stmt ->
@@ -3121,16 +3609,16 @@ public class Sql {
 
     /**
      * Performs the closure (containing batch operations) within a batch using a given batch size.
-     * <p/>
+     * <p>
      * After every <code>batchSize</code> <code>addBatch(sqlBatchOperation)</code>
      * operations, automatically calls an <code>executeBatch()</code> operation to "chunk" up the database operations
      * into partitions. Though not normally needed, you can also explicitly call <code>executeBatch()</code> which
      * after executing the current batch, resets the batch count back to zero.
-     * <p/>
+     * <p>
      * The closure will be called with a single argument; the database statement
      * (actually a <code>BatchingStatementWrapper</code> helper object)
      * associated with this batch.
-     * <p/>
+     * <p>
      * Use it like this for batchSize of 20:
      * <pre>
      * def updateCounts = sql.withBatch(20) { stmt ->
@@ -3186,15 +3674,15 @@ public class Sql {
     /**
      * Performs the closure (containing batch operations specific to an associated prepared statement)
      * within a batch. Uses a batch size of zero, i.e. no automatic partitioning of batches.
-     * <p/>
+     * <p>
      * This means that <code>executeBatch()</code> will be called automatically after the <code>withBatch</code>
      * closure has finished but may be called explicitly if desired as well for more fine-grained
      * partitioning of the batch.
-     * <p/>
+     * <p>
      * The closure will be called with a single argument; the prepared
      * statement (actually a <code>BatchingPreparedStatementWrapper</code> helper object)
      * associated with this batch.
-     * <p/>
+     * <p>
      * An example:
      * <pre>
      * def updateCounts = sql.withBatch('insert into TABLENAME(a, b, c) values (?, ?, ?)') { ps ->
@@ -3235,16 +3723,16 @@ public class Sql {
     /**
      * Performs the closure (containing batch operations specific to an associated prepared statement)
      * within a batch using a given batch size.
-     * <p/>
+     * <p>
      * After every <code>batchSize</code> <code>addBatch(params)</code>
      * operations, automatically calls an <code>executeBatch()</code> operation to "chunk" up the database operations
      * into partitions. Though not normally needed, you can also explicitly call <code>executeBatch()</code> which
      * after executing the current batch, resets the batch count back to zero.
-     * <p/>
+     * <p>
      * The closure will be called with a single argument; the prepared
      * statement (actually a <code>BatchingPreparedStatementWrapper</code> helper object)
      * associated with this batch.
-     * <p/>
+     * <p>
      * Below is an example using a batchSize of 20:
      * <pre>
      * def updateCounts = sql.withBatch(20, 'insert into TABLENAME(a, b, c) values (?, ?, ?)') { ps ->
@@ -3305,7 +3793,7 @@ public class Sql {
     public int[] withBatch(int batchSize, String sql, Closure closure) throws SQLException {
         Connection connection = createConnection();
         List<Tuple> indexPropList = null;
-        SqlWithParams preCheck = preCheckForNamedParams(sql);
+        SqlWithParams preCheck = buildSqlWithIndexedProps(sql);
         boolean savedWithinBatch = withinBatch;
         BatchingPreparedStatementWrapper psWrapper = null;
         if (preCheck != null) {
@@ -3334,7 +3822,7 @@ public class Sql {
     }
 
     /**
-     * Caches every created preparedStatement in Closure <i>closure</i></br>
+     * Caches every created preparedStatement in Closure <i>closure</i>
      * Every cached preparedStatement is closed after closure has been called.
      * If the closure takes a single argument, it will be called
      * with the connection, otherwise it will be called with no arguments.
@@ -3447,8 +3935,8 @@ public class Sql {
             if (!cursorAtRow) return null;
 
             int i = 0;
-            while (rs.next() && (maxRows <= 0 || i++ < maxRows)) {
-                results.add(SqlGroovyMethods.toRowResult(rs));
+            while ((maxRows <= 0 || i++ < maxRows) && rs.next()) {
+                results.add(toRowResult(rs));
             }
             return (results);
         } catch (SQLException e) {
@@ -3878,7 +4366,7 @@ public class Sql {
     }
 
     public SqlWithParams checkForNamedParams(String sql, List<Object> params) {
-        SqlWithParams preCheck = preCheckForNamedParams(sql);
+        SqlWithParams preCheck = buildSqlWithIndexedProps(sql);
         if (preCheck == null) {
             return new SqlWithParams(sql, params);
         }
@@ -3890,19 +4378,48 @@ public class Sql {
         return new SqlWithParams(preCheck.getSql(), getUpdatedParams(params, indexPropList));
     }
 
+    /**
+     * @deprecated Use {@link #buildSqlWithIndexedProps(String)} instead
+     */
+    @Deprecated
     public SqlWithParams preCheckForNamedParams(String sql) {
+        return buildSqlWithIndexedProps(sql);
+    }
+
+    /**
+     * Hook to allow derived classes to override behavior associated with the
+     * parsing and indexing of parameters from a given sql statement.
+     *
+     * @param sql the sql statement to process
+     * @return a {@link SqlWithParams} instance containing the parsed sql
+     *         and parameters containing the indexed location and property
+     *         name of parameters or {@code null} if no parsing of
+     *         the sql was performed.
+     */
+    protected SqlWithParams buildSqlWithIndexedProps(String sql) {
         // look for quick exit
-        if (!enableNamedQueries || !NAMED_QUERY_PATTERN.matcher(sql).find()) {
+        if (!enableNamedQueries || !ExtractIndexAndSql.hasNamedParameters(sql)) {
             return null;
         }
 
-        ExtractIndexAndSql extractIndexAndSql = new ExtractIndexAndSql(sql).invoke();
-        String newSql = extractIndexAndSql.getNewSql();
+        String newSql;
+        List<Tuple> propList;
+        if (cacheNamedQueries && namedParamSqlCache.containsKey(sql)) {
+            newSql = namedParamSqlCache.get(sql);
+            propList = namedParamIndexPropCache.get(sql);
+        } else {
+            ExtractIndexAndSql extractIndexAndSql = ExtractIndexAndSql.from(sql);
+            newSql = extractIndexAndSql.getNewSql();
+            propList = extractIndexAndSql.getIndexPropList();
+            namedParamSqlCache.put(sql, newSql);
+            namedParamIndexPropCache.put(sql, propList);
+        }
+
         if (sql.equals(newSql)) {
             return null;
         }
 
-        List<Object> indexPropList = new ArrayList<Object>(extractIndexAndSql.getIndexPropList());
+        List<Object> indexPropList = new ArrayList<Object>(propList);
         return new SqlWithParams(newSql, indexPropList);
     }
 
@@ -3930,8 +4447,8 @@ public class Sql {
     }
 
     /**
-     * Enables named query caching.</br>
-     * if <i>cacheNamedQueries</i> is true, cache is created and processed named queries will be cached.</br>
+     * Enables named query caching.<br>
+     * if <i>cacheNamedQueries</i> is true, cache is created and processed named queries will be cached.
      * if <i>cacheNamedQueries</i> is false, no caching will occur saving memory at the cost of additional processing time.
      *
      * @param cacheNamedQueries the new value
@@ -3948,9 +4465,11 @@ public class Sql {
     }
 
     /**
-     * Enables named query support.</br>
-     * if <i>enableNamedQueries</i> is true, queries with ':propname' and '?1.propname' style placeholders will be processed.</br>
-     * if <i>enableNamedQueries</i> is false, this feature will be turned off.
+     * Enables named query support:
+     * <ul>
+     *     <li>if <i>enableNamedQueries</i> is true, queries with ':propname' and '?1.propname' style placeholders will be processed.</li>
+     *     <li>if <i>enableNamedQueries</i> is false, this feature will be turned off.</li>
+     * </ul>
      *
      * @param enableNamedQueries the new value
      */
@@ -3982,11 +4501,22 @@ public class Sql {
         }
 
         protected PreparedStatement execute(Connection connection, String sql) throws SQLException {
-            if (returnGeneratedKeys != 0)
+            if (returnGeneratedKeys == USE_COLUMN_NAMES && keyColumnNames != null) {
+                return connection.prepareStatement(sql, keyColumnNames.toArray(new String[keyColumnNames.size()]));
+            }
+            if (returnGeneratedKeys != 0) {
                 return connection.prepareStatement(sql, returnGeneratedKeys);
-            if (appearsLikeStoredProc(sql))
-                return connection.prepareCall(sql);
-            return connection.prepareStatement(sql);
+            }
+            if (appearsLikeStoredProc(sql)) {
+                if (resultSetHoldability == -1) {
+                    return connection.prepareCall(sql, resultSetType, resultSetConcurrency);
+                }
+                return connection.prepareCall(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
+            }
+            if (resultSetHoldability == -1) {
+                return connection.prepareStatement(sql, resultSetType, resultSetConcurrency);
+            }
+            return connection.prepareStatement(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
         }
 
         private boolean appearsLikeStoredProc(String sql) {
@@ -4005,6 +4535,7 @@ public class Sql {
         protected final String sql;
         protected Statement statement;
         private Connection connection;
+        private int maxRows = 0;
 
         protected AbstractQueryCommand(String sql) {
             // Don't create statement in subclass constructors to avoid throw in constructors
@@ -4063,6 +4594,24 @@ public class Sql {
          * @throws SQLException if a database error occurs
          */
         protected abstract ResultSet runQuery(Connection connection) throws SQLException;
+
+        /**
+         * Set the maximum number of rows to return in the ResultSet
+         *
+         * @param maxRows the maximum number of rows
+         */
+        protected void setMaxRows(int maxRows) {
+            this.maxRows = maxRows;
+        }
+
+        /**
+         * Get the maximum number of rows to return in the ResultSet
+         *
+         * @return the maximum number of rows
+         */
+        protected int getMaxRows() {
+            return maxRows;
+        }
     }
 
     private final class PreparedQueryCommand extends AbstractQueryCommand {
@@ -4077,6 +4626,7 @@ public class Sql {
         protected ResultSet runQuery(Connection connection) throws SQLException {
             PreparedStatement s = getPreparedStatement(connection, sql, params);
             statement = s;
+            if (getMaxRows() != 0) statement.setMaxRows(getMaxRows());
             return s.executeQuery();
         }
     }
@@ -4090,6 +4640,7 @@ public class Sql {
         @Override
         protected ResultSet runQuery(Connection connection) throws SQLException {
             statement = getStatement(connection, sql);
+            if (getMaxRows() != 0) statement.setMaxRows(getMaxRows());
             return statement.executeQuery(sql);
         }
     }
@@ -4137,80 +4688,4 @@ public class Sql {
     protected void setInternalConnection(Connection conn) {
     }
 
-    private class ExtractIndexAndSql {
-        private String sql;
-        private List<Tuple> indexPropList;
-        private String newSql;
-
-        private ExtractIndexAndSql(String sql) {
-            this.sql = sql;
-        }
-
-        private List<Tuple> getIndexPropList() {
-            return indexPropList;
-        }
-
-        private String getNewSql() {
-            return newSql;
-        }
-
-        private ExtractIndexAndSql invoke() {
-            if (cacheNamedQueries && namedParamSqlCache.containsKey(sql)) {
-                newSql = namedParamSqlCache.get(sql);
-                indexPropList = namedParamIndexPropCache.get(sql);
-            } else {
-                indexPropList = new ArrayList<Tuple>();
-                StringBuilder sb = new StringBuilder();
-                StringBuilder currentChunk = new StringBuilder();
-                char[] chars = sql.toCharArray();
-                int i = 0;
-                boolean inString = false; //TODO: Cater for comments?
-                while (i < chars.length) {
-                    switch (chars[i]) {
-                        case '\'':
-                            inString = !inString;
-                            if (inString) {
-                                sb.append(adaptForNamedParams(currentChunk.toString(), indexPropList));
-                                currentChunk = new StringBuilder();
-                                currentChunk.append(chars[i]);
-                            } else {
-                                currentChunk.append(chars[i]);
-                                sb.append(currentChunk);
-                                currentChunk = new StringBuilder();
-                            }
-                            break;
-                        default:
-                            currentChunk.append(chars[i]);
-                    }
-                    i++;
-                }
-                if (inString)
-                    throw new IllegalStateException("Failed to process query. Unterminated ' character?");
-                sb.append(adaptForNamedParams(currentChunk.toString(), indexPropList));
-                newSql = sb.toString();
-                namedParamSqlCache.put(sql, newSql);
-                namedParamIndexPropCache.put(sql, indexPropList);
-            }
-            return this;
-        }
-
-        private String adaptForNamedParams(String sql, List<Tuple> indexPropList) {
-            StringBuilder newSql = new StringBuilder();
-            int txtIndex = 0;
-
-            Matcher matcher = NAMED_QUERY_PATTERN.matcher(sql);
-            while (matcher.find()) {
-                newSql.append(sql.substring(txtIndex, matcher.start())).append('?');
-                String indexStr = matcher.group(1);
-                if (indexStr == null) indexStr = matcher.group(3);
-                int index = (indexStr == null || indexStr.length() == 0 || ":".equals(indexStr)) ? 0 : new Integer(indexStr) - 1;
-                String prop = matcher.group(2);
-                if (prop == null) prop = matcher.group(4);
-                indexPropList.add(new Tuple(new Object[]{index, prop == null || prop.length() == 0 ? "<this>" : prop}));
-                txtIndex = matcher.end();
-            }
-            newSql.append(sql.substring(txtIndex)); // append ending SQL after last param.
-            return newSql.toString();
-        }
-    }
 }

@@ -1,4 +1,22 @@
 # -*- mode:sh -*-
+# ----------------------------------------------------------------------------
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# ----------------------------------------------------------------------------
 
 ##############################################################################
 ##                                                                          ##
@@ -68,6 +86,7 @@ fi
 # Attempt to set JAVA_HOME if it's not already set.
 if [ -z "$JAVA_HOME" ] ; then
     if $darwin ; then 
+        [ -z "$JAVA_HOME" -a -f "/usr/libexec/java_home" ] && export JAVA_HOME=`/usr/libexec/java_home`
         [ -z "$JAVA_HOME" -a -d "/Library/Java/Home" ] && export JAVA_HOME="/Library/Java/Home"
         [ -z "$JAVA_HOME" -a -d "/System/Library/Frameworks/JavaVM.framework/Home" ] && export JAVA_HOME="/System/Library/Frameworks/JavaVM.framework/Home"
     else
@@ -92,7 +111,7 @@ if $cygwin ; then
     [ -n "$JAVA_HOME" ] && JAVA_HOME=`cygpath --unix "$JAVA_HOME"`
     [ -n "$CP" ] && CP=`cygpath --path --unix "$CP"`
 else
-    if [ -n "$GROOVY_HOME" -a `expr "$GROOVY_HOME":'\/$'` ] ; then
+    if [ -n "$GROOVY_HOME" -a "`expr "$GROOVY_HOME":'\/$'`" ] ; then
         GROOVY_HOME=`echo $GROOVY_HOME | sed -e 's/\/$//'`
     fi
 fi
@@ -194,7 +213,7 @@ TOOLS_JAR="$JAVA_HOME/lib/tools.jar"
 
 # For Darwin, add GROOVY_APP_NAME to the JAVA_OPTS as -Xdock:name
 if $darwin; then
-    JAVA_OPTS="$JAVA_OPTS -Xdock:name=$GROOVY_APP_NAME -Xdock:icon=$GROOVY_HOME/bin/groovy.icns"
+    JAVA_OPTS="$JAVA_OPTS -Xdock:name=$GROOVY_APP_NAME -Xdock:icon=$GROOVY_HOME/lib/groovy.icns"
 fi
 
 # For Cygwin, switch paths to Windows format before running java

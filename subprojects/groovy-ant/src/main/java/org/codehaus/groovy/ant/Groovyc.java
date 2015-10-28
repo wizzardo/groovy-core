@@ -1,45 +1,25 @@
-/*
- * Copyright 2003-2013 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.ant;
 
 import groovy.lang.GroovyClassLoader;
 import groovy.lang.GroovyResourceLoader;
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.GroovyPosixParser;
-import org.apache.commons.cli.Options;
-import org.apache.tools.ant.AntClassLoader;
-import org.apache.tools.ant.BuildException;
-import org.apache.tools.ant.DirectoryScanner;
-import org.apache.tools.ant.RuntimeConfigurable;
-import org.apache.tools.ant.taskdefs.Execute;
-import org.apache.tools.ant.taskdefs.Javac;
-import org.apache.tools.ant.taskdefs.MatchingTask;
-import org.apache.tools.ant.types.Path;
-import org.apache.tools.ant.types.Reference;
-import org.apache.tools.ant.util.GlobPatternMapper;
-import org.apache.tools.ant.util.SourceFileScanner;
-import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.CompilerConfiguration;
-import org.codehaus.groovy.control.SourceExtensionHandler;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
-import org.codehaus.groovy.tools.ErrorReporter;
-import org.codehaus.groovy.tools.FileSystemCompiler;
-import org.codehaus.groovy.tools.RootLoader;
-import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -57,8 +37,54 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.GroovyInternalPosixParser;
+import org.apache.commons.cli.Options;
+import org.apache.tools.ant.AntClassLoader;
+import org.apache.tools.ant.BuildException;
+import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.RuntimeConfigurable;
+import org.apache.tools.ant.taskdefs.Execute;
+import org.apache.tools.ant.taskdefs.Javac;
+import org.apache.tools.ant.taskdefs.MatchingTask;
+import org.apache.tools.ant.types.Path;
+import org.apache.tools.ant.types.Reference;
+import org.apache.tools.ant.util.GlobPatternMapper;
+import org.apache.tools.ant.util.SourceFileScanner;
+import org.codehaus.groovy.control.CompilationUnit;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.SourceExtensionHandler;
+import org.codehaus.groovy.runtime.DefaultGroovyMethods;
+import org.codehaus.groovy.runtime.DefaultGroovyStaticMethods;
+import org.codehaus.groovy.tools.ErrorReporter;
+import org.codehaus.groovy.tools.FileSystemCompiler;
+import org.codehaus.groovy.tools.RootLoader;
+import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit;
+
 /**
- * Compiles Groovy source files. This task can take the following arguments:
+ * Compiles Groovy source files using Ant.
+ * <p>
+ * Typically involves using Ant from the command-line and an Ant build file such as:
+ * <pre>
+ * &lt;?xml version="1.0"?&gt;
+ * &lt;project name="MyGroovyBuild" default="compile"&gt;
+ *   &lt;property name="groovy.home" value="/Path/To/Groovy"/&gt;
+ *   &lt;property name="groovy.version" value="X.Y.Z"/&gt;
+ *   &lt;path id="groovy.classpath"&gt;
+ *     &lt;fileset dir="${groovy.home}/embeddable"&gt;
+ *       &lt;include name="groovy-all-${groovy.version}.jar" /&gt;
+ *     &lt;/fileset&gt;
+ *   &lt;/path&gt;
+ *   &lt;taskdef name="groovyc" classname="org.codehaus.groovy.ant.Groovyc" classpathref="groovy.classpath"/&gt;
+ *
+ *   &lt;target name="compile" description="compile groovy sources"&gt;
+ *     &lt;groovyc srcdir="src" listfiles="true" classpathref="groovy.classpath"/&gt;
+ *   &lt;/target&gt;
+ * &lt;/project&gt;
+ * </pre>
+ * <p>
+ * This task can take the following arguments:
  * <ul>
  * <li>srcdir</li>
  * <li>scriptExtension</li>
@@ -90,17 +116,54 @@ import java.util.StringTokenizer;
  * <li>stubdir</li>
  * <li>keepStubs</li>
  * <li>forceLookupUnnamedFiles</li>
+ * <li>configscript</li>
  * </ul>
  * And these nested tasks:
  * <ul>
  * <li>javac</li>
  * </ul>
  * Of these arguments, the <b>srcdir</b> and <b>destdir</b> are required.
- * <p/>
+ * <p>
  * <p>When this task executes, it will recursively scan srcdir and destdir looking for Groovy source files
- * to compile. This task makes its compile decision based on timestamp.</p>
- * <p/>
- * <p>Based heavily on the Javac implementation in Ant.</p>
+ * to compile. This task makes its compile decision based on timestamp.
+ * <p>
+ * A more elaborate build file showing joint compilation:
+ * <pre>
+ * &lt;?xml version="1.0"?&gt;
+ * &lt;project name="MyJointBuild" default="compile"&gt;
+ *   &lt;property name="groovy.home" value="/Path/To/Groovy"/&gt;
+ *   &lt;property name="groovy.version" value="X.Y.Z"/&gt;
+ *
+ *   &lt;path id="groovy.classpath"&gt;
+ *     &lt;fileset dir="${groovy.home}/embeddable"&gt;
+ *       &lt;include name="groovy-all-${groovy.version}.jar" /&gt;
+ *     &lt;/fileset&gt;
+ *   &lt;/path&gt;
+ *
+ *   &lt;target name="clean" description="remove all built files"&gt;
+ *     &lt;delete dir="classes" /&gt;
+ *   &lt;/target&gt;
+ *
+ *   &lt;target name="compile" depends="init" description="compile java and groovy sources"&gt;
+ *     &lt;mkdir dir="classes" /&gt;
+ *     &lt;groovyc destdir="classes" srcdir="src" listfiles="true" keepStubs="true" stubdir="stubs"&gt;
+ *       &lt;javac debug="on" deprecation="true"/&gt;
+ *       &lt;classpath&gt;
+ *         &lt;fileset dir="classes"/&gt;
+ *         &lt;path refid="groovy.classpath"/&gt;
+ *       &lt;/classpath&gt;
+ *     &lt;/groovyc&gt;
+ *   &lt;/target&gt;
+ *
+ *   &lt;target name="init"&gt;
+ *     &lt;taskdef name="groovyc" classname="org.codehaus.groovy.ant.Groovyc" classpathref="groovy.classpath"/&gt;
+ *   &lt;/target&gt;
+ * &lt;/project&gt;
+ * </pre>
+ * <p>
+ * Based heavily on the Javac implementation in Ant.
+ * <p>
+ * Can also be used from {@link groovy.util.AntBuilder} to allow the build file to be scripted in Groovy.
  *
  * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  * @author Hein Meling
@@ -109,6 +172,7 @@ import java.util.StringTokenizer;
  * @author Paul King
  */
 public class Groovyc extends MatchingTask {
+    private static final URL[] EMPTY_URL_ARRAY = new URL[0];
     private final LoggingHelper log = new LoggingHelper(this);
 
     private Path src;
@@ -147,6 +211,7 @@ public class Groovyc extends MatchingTask {
     private boolean forceLookupUnnamedFiles;
     private boolean useIndy;
     private String scriptBaseClass;
+    private String configscript;
 
     private Set<String> scriptExtensions = new LinkedHashSet<String>();
 
@@ -653,6 +718,24 @@ public class Groovyc extends MatchingTask {
     }
 
     /**
+     * Get the configuration file used to customize the compilation configuration.
+     *
+     * @return a path to a configuration script
+     */
+    public String getConfigscript() {
+        return configscript;
+    }
+
+    /**
+     * Set the configuration file used to customize the compilation configuration.
+     *
+     * @param configscript a path to a configuration script
+     */
+    public void setConfigscript(final String configscript) {
+        this.configscript = configscript;
+    }
+
+    /**
      * Set the stub directory into which the Java source stub
      * files should be generated. The directory need not exist
      * and will not be deleted automatically - though its contents
@@ -970,11 +1053,15 @@ public class Groovyc extends MatchingTask {
             commandLineList.add("-e");
         }
         if (useIndy) {
-            commandLineList.add("-indy");
+            commandLineList.add("--indy");
         }
         if (scriptBaseClass != null) {
             commandLineList.add("-b");
             commandLineList.add(scriptBaseClass);
+        }
+        if (configscript != null) {
+            commandLineList.add("--configscript");
+            commandLineList.add(configscript);
         }
     }
 
@@ -1052,7 +1139,7 @@ public class Groovyc extends MatchingTask {
         try {
             Options options = FileSystemCompiler.createCompilationOptions();
 
-            CommandLineParser cliParser = new GroovyPosixParser();
+            CommandLineParser cliParser = new GroovyInternalPosixParser();
 
             CommandLine cli;
             cli = cliParser.parse(options, commandLine);
@@ -1094,7 +1181,7 @@ public class Groovyc extends MatchingTask {
             }
 
             if (failOnError) {
-                log.info(message);
+                log.error(message);
                 throw new BuildException("Compilation Failed", t, getLocation());
             } else {
                 log.error(message);
@@ -1149,7 +1236,7 @@ public class Groovyc extends MatchingTask {
                 options.put("stubDir", stubDir);
             } else {
                 try {
-                    File tempStubDir = FileSystemCompiler.createTempDir();
+                    File tempStubDir = DefaultGroovyStaticMethods.createTempDir(null, "groovy-generated-", "-java-source");
                     temporaryFiles.add(tempStubDir);
                     options.put("stubDir", tempStubDir);
                 } catch (IOException ioe) {
@@ -1169,7 +1256,7 @@ public class Groovyc extends MatchingTask {
         }
         ClassLoader parent = getIncludeantruntime()
                 ? getClass().getClassLoader()
-                : new AntClassLoader(new RootLoader(new URL[0], null), getProject(), getClasspath());
+                : new AntClassLoader(new RootLoader(EMPTY_URL_ARRAY, null), getProject(), getClasspath());
         if (parent instanceof AntClassLoader) {
             AntClassLoader antLoader = (AntClassLoader) parent;
             String[] pathElm = antLoader.getClasspath().split(File.pathSeparator);
@@ -1192,8 +1279,14 @@ public class Groovyc extends MatchingTask {
                  * seems like AntClassLoader doesn't check if the file
                  * may not exist in the classpath yet
                  */
-                if (!found && new File(cpEntry).exists())
-                    antLoader.addPathElement(cpEntry);
+                if (!found && new File(cpEntry).exists()) {
+                	try {
+                		antLoader.addPathElement(cpEntry);
+                	}
+                	catch(BuildException e) {
+                		log.warn("The classpath entry " + cpEntry + " is not a valid Java resource");
+                	}
+                }
             }
         }
 

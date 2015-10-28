@@ -1,17 +1,20 @@
-/*
- * Copyright 2008-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.transform;
 
@@ -24,7 +27,7 @@ import java.lang.annotation.Target;
 
 /**
  * Class annotation used to assist in creating appropriate {@code equals()} and {@code hashCode()} methods.
- * <p/>
+ * <p>
  * It allows you to write classes in this shortened form:
  * <pre>
  * import groovy.transform.EqualsAndHashCode
@@ -42,15 +45,15 @@ import java.lang.annotation.Target;
  * </pre>
  * The {@code @EqualsAndHashCode} annotation instructs the compiler to execute an
  * AST transformation which adds the necessary equals and hashCode methods to the class.
- * <p/>
+ * <p>
  * The {@code hashCode()} method is calculated using Groovy's {@code HashCodeHelper} class
  * which implements an algorithm similar to the one outlined in the book <em>Effective Java</em>.
- * <p/>
+ * <p>
  * The {@code equals()} method compares the values of the individual properties (and optionally fields)
  * of the class.  It can also optionally call equals on the super class. Two different equals method
  * implementations are supported both of which support the equals contract outlined in the javadoc
  * for <code>java.lang.Object</code>
- * <p/>
+ * <p>
  * To illustrate the 'canEqual' implementation style (see http://www.artima.com/lejava/articles/equality.html
  * for further details), consider this class:
  * <pre>
@@ -84,7 +87,7 @@ import java.lang.annotation.Target;
  * {@code @Canonical} class IntPair { int x, y }
  * def p1 = new IntPair(1, 2)
  *
- * // overriden getter but deemed an IntPair as far as domain is concerned
+ * // overridden getter but deemed an IntPair as far as domain is concerned
  * def p2 = new IntPair(1, 1) { int getY() { 2 } }
  *
  * // additional helper method added through inheritance but
@@ -135,12 +138,12 @@ import java.lang.annotation.Target;
  * allowed) which have only <code>java.lang.Object</code> as a super class.
  * Most {@code @Immutable} classes fall in to this category. For such classes,
  * there is no need to introduce the <code>canEqual()</code> method.
- * <p/>
+ * <p>
  * Note that if you explicitly set <code>useCanEqual=false</code> for child nodes
  * in a class hierarchy but have it <code>true</code> for parent nodes and you
  * also have <code>callSuper=true</code> in the child, then your generated
  * equals methods will not strictly follow the equals contract.
- * <p/>
+ * <p>
  * Note that when used in the recommended fashion, the two implementations supported adhere
  * to the equals contract. You can provide your own equivalence relationships if you need,
  * e.g. for comparing instances of the <code>IntPair</code> and <code>IntTriple</code> classes
@@ -177,6 +180,18 @@ import java.lang.annotation.Target;
  * assert  new Point1D(1, 1, 1).equals(new Point1D(1, 2, 1))
  * assert !new Point1D(1, 1, 1).equals(new Point1D(2, 1, 1))
  * </pre>
+ * <b>Note:</b> {@code @EqualsAndHashCode} is a transform to help reduce boilerplate
+ * in the common cases. It provides a useful implementation of {@code equals()}
+ * and {@code hashCode()} but not necessarily the most appropriate or
+ * efficient one for every use case. You should write custom versions if your
+ * scenario demands it. In particular, if you have
+ * mutually-referential classes, the implementations provided may not be suitable
+ * and may recurse infinitely (leading to a {@code StackOverflowError}). In such cases,
+ * you need to remove the infinite loop from your data structures or write your own custom methods.
+ * If your data structures are self-referencing, the code generated by this transform will try to avoid
+ * infinite recursion but the algorithm used may not suit your scenario, so use with caution if
+ * you have such structures.
+ * A future version of this transform may better handle some additional recursive scenarios.
  *
  * @see org.codehaus.groovy.util.HashCodeHelper
  * @author Paul King
@@ -200,6 +215,12 @@ public @interface EqualsAndHashCode {
      * can be used in addition to an array (using Groovy's literal list notation) of String values.
      */
     String[] includes() default {};
+
+    /**
+     * Whether to cache hashCode calculations. You should only set this to true if
+     * you know the object is immutable (or technically mutable but never changed).
+     */
+    boolean cache() default false;
 
     /**
      * Whether to include super in equals and hashCode calculations.

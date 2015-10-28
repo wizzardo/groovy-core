@@ -1,17 +1,20 @@
 /*
- * Copyright 2008-2010 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.transform
 
@@ -502,14 +505,82 @@ class CanonicalTransformTest extends GroovyShellTestCase {
         """
     }
 
-    void testTupleConstructorWithEnum() {
+    void testEqualsCopesWithSelfReference() {
         assertScript """
-            @groovy.transform.TupleConstructor
-            enum Operator {
-                PLUS('+'), MINUS('-')
-                String symbol
+            @groovy.transform.Canonical class Tree {
+              Tree left, right
+              Object item
             }
-            assert Operator.PLUS.next() == Operator.MINUS
+
+            def t = new Tree()
+            t.left = t
+            t.item = 4
+            def s = new Tree()
+            s.left = s
+            s.item = 4
+            assert s.equals(t)
+            // not smart enough to handle mutual-recursion yet
+            // don't use this annotation in such a scenario
+            //
+            // t.right = s
+            // s.right = t
+            // assert s.equals(t) // <= StackOverflowError
+        """
+    }
+
+    void testHashCodeCopesWithSelfReference() {
+        assertScript """
+            @groovy.transform.Canonical class Tree {
+                Object item
+                Tree left, right
+            }
+
+            def t = new Tree(4)
+            t.left = t
+            t.right = t
+            assert t.hashCode() == 3941
+            // not smart enough to handle mutual-recursion yet
+            // don't use this annotation in such a scenario
+            //
+            // def s = new Tree(5, t)
+            // t.left = s
+            // println t.hashCode() // <= StackOverflowError
+        """
+    }
+
+    void testMapStyleConstructorSupportWithObjectOrMapFirstProperty() {
+        // GROOVY-5243: special support for Map, Object, AbstractMap, HashMap but currently not LinkedHashMap
+        assertScript """
+            import groovy.transform.*
+
+            def obj1 = new Canonical1(foo: [:], bar: 'BAR')
+            def obj2 = new Canonical2(foo: [:], bar: 'BAR')
+            def obj3 = new Canonical3(foo: [:], bar: 'BAR')
+
+            check(obj1)
+            check(obj2)
+            check(obj3)
+
+            def check(obj) {
+              assert obj.foo == [:]
+              assert obj.bar == 'BAR'
+            }
+
+            @Canonical
+            class Canonical1 {
+                def foo
+                String bar
+            }
+            @Canonical
+            class Canonical2 {
+                Map foo
+                String bar
+            }
+            @Canonical
+            class Canonical3 {
+                HashMap foo
+                String bar
+            }
         """
     }
 

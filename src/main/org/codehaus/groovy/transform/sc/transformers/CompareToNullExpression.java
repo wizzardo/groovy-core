@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2009 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.transform.sc.transformers;
 
@@ -54,24 +57,24 @@ public class CompareToNullExpression extends BinaryExpression implements Opcodes
         if (visitor instanceof AsmClassGenerator) {
             AsmClassGenerator acg = (AsmClassGenerator) visitor;
             WriterController controller = acg.getController();
-            ClassNode objectType = controller.getTypeChooser().resolveType(objectExpression, controller.getClassNode());
             MethodVisitor mv = controller.getMethodVisitor();
-            if (ClassHelper.isPrimitiveType(objectType)) {
-                // we're in a primitive == null comparison, which *always* return false
+            objectExpression.visit(acg);
+            ClassNode top = controller.getOperandStack().getTopOperand();
+            if (ClassHelper.isPrimitiveType(top)) {
+                controller.getOperandStack().pop();
                 mv.visitInsn(ICONST_0);
                 controller.getOperandStack().push(ClassHelper.boolean_TYPE);
-            } else {
-                objectExpression.visit(acg);
-                Label zero = new Label();
-                mv.visitJumpInsn(equalsNull?IFNONNULL:IFNULL, zero);
-                mv.visitInsn(ICONST_1);
-                Label end = new Label();
-                mv.visitJumpInsn(GOTO, end);
-                mv.visitLabel(zero);
-                mv.visitInsn(ICONST_0);
-                mv.visitLabel(end);
-                controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
+                return;
             }
+            Label zero = new Label();
+            mv.visitJumpInsn(equalsNull ? IFNONNULL : IFNULL, zero);
+            mv.visitInsn(ICONST_1);
+            Label end = new Label();
+            mv.visitJumpInsn(GOTO, end);
+            mv.visitLabel(zero);
+            mv.visitInsn(ICONST_0);
+            mv.visitLabel(end);
+            controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
         } else {
             super.visit(visitor);
         }

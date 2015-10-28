@@ -1,20 +1,24 @@
 /*
- * Copyright 2003-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.beans
 
+import java.lang.annotation.Documented
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
@@ -23,14 +27,14 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
 
 
 /**
- * This annotation adds Java-style listener support to a class based on an annotated Collection-property. <br/><br/>
- *
+ * This annotation adds Java-style listener support to a class based on an annotated Collection-property.
+ * <p>
  * For any given Collection property, several methods will be written into the enclosing class during the compile phase. These
  * changes are visible from Java or other languages. The List is intended to hold listeners of some sort, and the methods
  * addListener, removeListener, and getListeners are all added to the class. The actual methods names depend on the generic
  * type of the collection.
- *
- * Given the following example:<br/>
+ * <p>
+ * Given the following example:<br>
  * <pre>
  * class MyClass {
  *     &#064;groovy.beans.ListenerList
@@ -40,7 +44,6 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
  * The following code is generated:
  * <pre>
  * public class MyClass extends java.lang.Object {
- *
  *     &#064;groovy.beans.ListenerList
  *     private java.util.List&lt;java.awt.event.ActionListener&gt; listeners
  *
@@ -83,8 +86,8 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
  * }
  * </pre>
  * A fire method is created for each public method in the target class. In this case, ActionListener only has one
- * method. For a four method interface, four fire methods would be created. <br/><br/>
- * 
+ * method. For a four method interface, four fire methods would be created.
+ * <p>
  * The annotation can take the following parameters:
  * <pre>
  * name        = a suffix for creating the add, remove, and get methods.
@@ -95,7 +98,7 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
  * synchronize = Whether or not the methods created should be synchronized at the method level. 
  *               Default: false
  * </pre>
- *
+ * <p>
  * <strong>Compilation Errors</strong> - Using this annotation incorrectly results in compilation errors rather
  * than runtime errors. A list of potential problems includes:
  * <ul>
@@ -104,12 +107,12 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
  * <li>The annotated Collection field must not have a generic wildcard declared</li>
  * <li>The generated methods must not already exist</li>
  * </ul>
- * @see ListenerListASTTransformation
  *
+ * @see ListenerListASTTransformation
  * @author Alexander Klein
  * @author Hamlet D'Arcy
  */
-@java.lang.annotation.Documented
+@Documented
 @Retention(RetentionPolicy.SOURCE)
 @Target(ElementType.FIELD)
 @GroovyASTTransformationClass('groovy.beans.ListenerListASTTransformation')

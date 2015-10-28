@@ -1,19 +1,21 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.util;
 
 import groovy.lang.GroovyClassLoader;
@@ -37,15 +39,14 @@ import java.util.logging.Logger;
  * The files are assumed to be Groovy source files and be either a TestCase or a Script that can
  * be wrapped transparently into a TestCase.
  * The directory and the pattern can be set via System properties (see this classes' constants for details.)
- * <p/>
- * When setting the loglevel of this class to FINEST, all file loading will be logged.
- * <p/>
+ * <p>
+ * When setting the log level of this class to FINEST, all file loading will be logged.
+ * <p>
  * See also groovy.util.AllTestSuiteTest.groovy
  *
  * @author Andrew Glover
  * @author Dierk Koenig
  * @author Paul King
- *         todo: dk: make FileNameFinder injectable
  */
 public class AllTestSuite extends TestSuite {
 
@@ -84,6 +85,7 @@ public class AllTestSuite extends TestSuite {
 
     static { // this is only needed since the Groovy Build compiles *.groovy files after *.java files
         try {
+            // TODO: dk: make FileNameFinder injectable
             Class finderClass = Class.forName("groovy.util.FileNameFinder");
             finder = (IFileNameFinder) finderClass.newInstance();
         } catch (Exception e) {

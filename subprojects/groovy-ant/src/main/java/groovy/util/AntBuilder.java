@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.util;
 
@@ -21,6 +24,7 @@ import org.apache.tools.ant.dispatch.DispatchUtils;
 import org.apache.tools.ant.helper.AntXMLContext;
 import org.apache.tools.ant.helper.ProjectHelper2;
 import org.codehaus.groovy.ant.FileScanner;
+import org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport;
 import org.xml.sax.Attributes;
 import org.xml.sax.Locator;
 import org.xml.sax.SAXParseException;
@@ -50,6 +54,7 @@ import java.util.logging.Logger;
  * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  * @author Dierk Koenig (dk)
  * @author Marc Guillemot
+ * @author Paul King
  */
 public class AntBuilder extends BuilderSupport {
 
@@ -60,9 +65,20 @@ public class AntBuilder extends BuilderSupport {
     private final ProjectHelper2.TargetHandler antTargetHandler = new ProjectHelper2.TargetHandler();
     private final Target collectorTarget;
     private final Target implicitTarget;
+    private Target definingTarget;
     private Object lastCompletedNode;
     // true when inside a task so special ant.target handling occurs just at top level
     boolean insideTask;
+
+    private boolean saveStreams = true;
+    private static Integer streamCount = 0;
+    private static InputStream savedIn;
+    private static PrintStream savedErr;
+    private static PrintStream savedOut;
+    private static DemuxInputStream demuxInputStream;
+    private static DemuxOutputStream demuxOutputStream;
+    private static DemuxOutputStream demuxErrorStream;
+    private static InputStream savedProjectInputStream;
 
     public AntBuilder() {
         this(createProject());
@@ -87,14 +103,14 @@ public class AntBuilder extends BuilderSupport {
         collectorTarget.setProject(project);
         antXmlContext.setCurrentTarget(collectorTarget);
         antXmlContext.setLocator(new AntBuilderLocator());
-        antXmlContext.setCurrentTargets(new HashMap());
+        antXmlContext.setCurrentTargets(new HashMap<String, Target>());
 
         implicitTarget = new Target();
         implicitTarget.setProject(project);
         implicitTarget.setName("");
         antXmlContext.setImplicitTarget(implicitTarget);
 
-        // FileScanner is a Groovy hack (utility?)
+        // FileScanner is a Groovy utility
         project.addDataTypeDefinition("fileScanner", FileScanner.class);
     }
 
@@ -132,6 +148,27 @@ public class AntBuilder extends BuilderSupport {
      */
     public AntXMLContext getAntXmlContext() {
         return antXmlContext;
+    }
+
+    /**
+     * Whether stdin, stdout, stderr streams are saved.
+     *
+     * @return true if we are saving streams
+     * @see #setSaveStreams(boolean)
+     */
+    public boolean isSaveStreams() {
+        return saveStreams;
+    }
+
+    /**
+     * Indicates that we save stdin, stdout, stderr and replace them
+     * while AntBuilder is executing tasks with
+     * streams that funnel the normal streams into Ant's logs.
+     *
+     * @param saveStreams set to false to disable this behavior
+     */
+    public void setSaveStreams(boolean saveStreams) {
+        this.saveStreams = saveStreams;
     }
 
     /**
@@ -193,6 +230,10 @@ public class AntBuilder extends BuilderSupport {
             log.finest("parent is not null: no perform on nodeCompleted");
             return; // parent will care about when children perform
         }
+        if (definingTarget != null && definingTarget == parent && node instanceof Task) return; // inside defineTarget
+        if (definingTarget == node) {
+            definingTarget = null;
+        }
 
         // as in Target.execute()
         if (node instanceof Task) {
@@ -203,27 +244,53 @@ public class AntBuilder extends BuilderSupport {
                 throw new BuildException("antcall not supported within AntBuilder, consider using 'ant.project.executeTarget('targetName')' instead.");
             }
 
-            // save original streams
-            InputStream savedProjectInputStream = project.getDefaultInputStream();
-            InputStream savedIn = System.in;
-            PrintStream savedErr = System.err;
-            PrintStream savedOut = System.out;
+            if (saveStreams) {
+                // save original streams
+                synchronized (AntBuilder.class) {
+                    int currentStreamCount = streamCount++;
+                    if (currentStreamCount == 0) {
+                        // we are first, save the streams
+                        savedProjectInputStream = project.getDefaultInputStream();
+                        savedIn = System.in;
+                        savedErr = System.err;
+                        savedOut = System.out;
 
-            if (!(savedIn instanceof DemuxInputStream)) {
-                project.setDefaultInputStream(savedIn);
-                System.setIn(new DemuxInputStream(project));
+                        if (!(savedIn instanceof DemuxInputStream)) {
+                            project.setDefaultInputStream(savedIn);
+                            demuxInputStream = new DemuxInputStream(project);
+                            System.setIn(demuxInputStream);
+                        }
+                        demuxOutputStream = new DemuxOutputStream(project, false);
+                        System.setOut(new PrintStream(demuxOutputStream));
+                        demuxErrorStream = new DemuxOutputStream(project, true);
+                        System.setErr(new PrintStream(demuxErrorStream));
+                    }
+                }
             }
-            System.setOut(new PrintStream(new DemuxOutputStream(project, false)));
-            System.setErr(new PrintStream(new DemuxOutputStream(project, true)));
 
             try {
                 lastCompletedNode = performTask(task);
             } finally {
-                // restore original streams
-                project.setDefaultInputStream(savedProjectInputStream);
-                System.setIn(savedIn);
-                System.setOut(savedOut);
-                System.setErr(savedErr);
+                if (saveStreams) {
+                    synchronized (AntBuilder.class) {
+                        int currentStreamCount = --streamCount;
+                        if (currentStreamCount == 0) {
+                            // last to leave, turn out the lights: restore original streams
+                            project.setDefaultInputStream(savedProjectInputStream);
+                            System.setOut(savedOut);
+                            System.setErr(savedErr);
+                            if (demuxInputStream != null) {
+                                System.setIn(savedIn);
+                                DefaultGroovyMethodsSupport.closeQuietly(demuxInputStream);
+                                demuxInputStream = null;
+                            }
+                            DefaultGroovyMethodsSupport.closeQuietly(demuxOutputStream);
+                            DefaultGroovyMethodsSupport.closeQuietly(demuxErrorStream);
+                            demuxOutputStream = null;
+                            demuxErrorStream = null;
+                        }
+                    }
+                }
             }
 
             // restore dummy collector target
@@ -342,6 +409,8 @@ public class AntBuilder extends BuilderSupport {
             antXmlContext.setCurrentTarget(implicitTarget);
         } else if ("target".equals(name) && !insideTask) {
             return onStartTarget(attrs, tagName, ns);
+        } else if ("defineTarget".equals(name) && !insideTask) {
+            return onDefineTarget(attrs, "target", ns);
         }
 
         try {
@@ -352,8 +421,25 @@ public class AntBuilder extends BuilderSupport {
         }
 
         insideTask = true;
-        final RuntimeConfigurable wrapper = (RuntimeConfigurable) antXmlContext.getWrapperStack().lastElement();
+        final RuntimeConfigurable wrapper = antXmlContext.getWrapperStack().lastElement();
         return wrapper.getProxy();
+    }
+
+    private Target onDefineTarget(final Attributes attrs, String tagName, String ns) {
+        final Target target = new Target();
+        target.setProject(project);
+        target.setLocation(new Location(antXmlContext.getLocator()));
+        try {
+            antTargetHandler.onStartElement(ns, tagName, tagName, attrs, antXmlContext);
+            final Target newTarget = getProject().getTargets().get(attrs.getValue("name"));
+            antXmlContext.setCurrentTarget(newTarget);
+            definingTarget = newTarget;
+            return newTarget;
+        }
+        catch (final SAXParseException e) {
+            log.log(Level.SEVERE, "Caught: " + e, e);
+        }
+        return null;
     }
 
     private Target onStartTarget(final Attributes attrs, String tagName, String ns) {
@@ -362,12 +448,12 @@ public class AntBuilder extends BuilderSupport {
         target.setLocation(new Location(antXmlContext.getLocator()));
         try {
             antTargetHandler.onStartElement(ns, tagName, tagName, attrs, antXmlContext);
-            final Target newTarget = (Target) getProject().getTargets().get(attrs.getValue("name"));
+            final Target newTarget = getProject().getTargets().get(attrs.getValue("name"));
 
             // execute dependencies (if any)
-            final Vector targets = new Vector();
-            for (final Enumeration deps = newTarget.getDependencies(); deps.hasMoreElements();) {
-                final String targetName = (String) deps.nextElement();
+            final Vector<Target> targets = new Vector<Target>();
+            for (final Enumeration<String> deps = newTarget.getDependencies(); deps.hasMoreElements();) {
+                final String targetName = deps.nextElement();
                 targets.add(project.getTargets().get(targetName));
             }
             getProject().executeSortedTargets(targets);

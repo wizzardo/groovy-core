@@ -1,22 +1,27 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.xml;
 
+import groovy.lang.Closure;
 import groovy.util.BuilderSupport;
 import groovy.util.IndentPrinter;
+import org.codehaus.groovy.runtime.StringGroovyMethods;
 
 import java.io.PrintWriter;
 import java.io.Writer;
@@ -24,10 +29,10 @@ import java.util.Map;
 import java.util.Iterator;
 
 /**
- * <p>A helper class for creating XML or HTML markup.
- * The builder supports various 'pretty printed' formats.</p>
- * <p/>
- * <p>Example:</p>
+ * A helper class for creating XML or HTML markup.
+ * The builder supports various 'pretty printed' formats.
+ * <p>
+ * Example:
  * <pre>new MarkupBuilder().root {
  *   a( a1:'one' ) {
  *     b { mkp.yield( '3 < 5' ) }
@@ -47,7 +52,7 @@ import java.util.Iterator;
  * away from the normal building mode of the builder and get access
  * to helper markup methods such as 'yield' and 'yieldUnescaped'.
  * See the javadoc for {@link #getMkp()} for further details.</li>
- *     <li>Note that tab, newline and carriage return characters are escaped within attributes, i.e. will become &#09;, &#10; and &#13; respectively</li>
+ *     <li>Note that tab, newline and carriage return characters are escaped within attributes, i.e. will become &amp;#09;, &amp;#10; and &amp;#13; respectively</li>
  * </ul>
  * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  * @author Stefan Matthias Aust
@@ -76,9 +81,9 @@ public class MarkupBuilder extends BuilderSupport {
     }
 
     /**
-     * Defaults to true.&nbsp;If set to false then you must escape any special
+     * Defaults to true.&#160;If set to false then you must escape any special
      * characters within attribute values such as '&amp;', '&lt;', CR/LF, single
-     * and double quotes etc.&nbsp;manually as needed. The builder will not guard
+     * and double quotes etc.&#160;manually as needed. The builder will not guard
      * against producing invalid XML when in this mode and the output may not
      * be able to be parsed/round-tripped but it does give you full control when
      * producing for instance HTML output.
@@ -205,7 +210,7 @@ public class MarkupBuilder extends BuilderSupport {
     }
 
     /**
-     * Whether empty elements are expanded from <tagName/> to <tagName></tagName>.
+     * Whether empty elements are expanded from &lt;tagName/&gt; to &lt;tagName&gt;&lt;/tagName&gt;.
      *
      * @param expandEmptyElements if <code>true</code>, empty
      *                            elements will be represented by an opening tag
@@ -233,7 +238,7 @@ public class MarkupBuilder extends BuilderSupport {
      *
      * @return this MarkupBuilder
      */
-    public Object getMkp() {
+    public MarkupBuilderHelper getMkp() {
         return new MarkupBuilderHelper(this);
     }
 
@@ -385,60 +390,52 @@ public class MarkupBuilder extends BuilderSupport {
     private String escapeXmlValue(String value, boolean isAttrValue) {
         if (value == null)
             throw new IllegalArgumentException();
-
-        StringBuilder sb = null; // lazy create for edge-case efficiency
-        for (int i = 0, len = value.length(); i < len; i++) {
-            final char ch = value.charAt(i);
-            final String replacement = checkForReplacement(isAttrValue, ch);
-
-            if (replacement != null) {
-                // output differs from input; we write to our local buffer
-                if (sb == null) {
-                    sb = new StringBuilder((int) (1.1 * len));
-                    sb.append(value.substring(0, i));
-                }
-                sb.append(replacement);
-            } else if (sb != null) {
-                // earlier output differs from input; we write to our local buffer
-                sb.append(ch);
-            }
-        }
-
-        return sb == null ? value : sb.toString();
+        return StringGroovyMethods.collectReplacements(value, new ReplacingClosure(isAttrValue, useDoubleQuotes));
     }
 
-    private String checkForReplacement(boolean isAttrValue, char ch) {
-        switch (ch) {
-            case '&':
-                return "&amp;";
-            case '<':
-                return "&lt;";
-            case '>':
-                return "&gt;";
-            case '\n':
-                if (isAttrValue) return "&#10;";
-                break;
-            case '\r':
-                if (isAttrValue) return "&#13;";
-                break;
-            case '\t':
-                if (isAttrValue) return "&#09;";
-                break;
-            case '"':
-                // The double quote is only escaped if the value is for
-                // an attribute and the builder is configured to output
-                // attribute values inside double quotes.
-                if (isAttrValue && useDoubleQuotes) return "&quot;";
-                break;
-            case '\'':
-                // The apostrophe is only escaped if the value is for an
-                // attribute, as opposed to element content, and if the
-                // builder is configured to surround attribute values with
-                // single quotes.
-                if (isAttrValue && !useDoubleQuotes) return "&apos;";
-                break;
+    private static class ReplacingClosure extends Closure<String> {
+        private final boolean isAttrValue;
+        private final boolean useDoubleQuotes;
+
+        public ReplacingClosure(boolean isAttrValue, boolean useDoubleQuotes) {
+            super(null);
+            this.isAttrValue = isAttrValue;
+            this.useDoubleQuotes = useDoubleQuotes;
         }
-        return null;
+
+        public String doCall(Character ch) {
+            switch (ch) {
+                case '&':
+                    return "&amp;";
+                case '<':
+                    return "&lt;";
+                case '>':
+                    return "&gt;";
+                case '\n':
+                    if (isAttrValue) return "&#10;";
+                    break;
+                case '\r':
+                    if (isAttrValue) return "&#13;";
+                    break;
+                case '\t':
+                    if (isAttrValue) return "&#09;";
+                    break;
+                case '"':
+                    // The double quote is only escaped if the value is for
+                    // an attribute and the builder is configured to output
+                    // attribute values inside double quotes.
+                    if (isAttrValue && useDoubleQuotes) return "&quot;";
+                    break;
+                case '\'':
+                    // The apostrophe is only escaped if the value is for an
+                    // attribute, as opposed to element content, and if the
+                    // builder is configured to surround attribute values with
+                    // single quotes.
+                    if (isAttrValue && !useDoubleQuotes) return "&apos;";
+                    break;
+            }
+            return null;
+        }
     }
 
     private void toState(int next, Object name) {

@@ -1,19 +1,21 @@
-/*
- * Copyright 2008 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package org.codehaus.groovy.transform;
 
 import org.codehaus.groovy.ast.ASTNode;
@@ -23,8 +25,8 @@ import org.codehaus.groovy.control.SourceUnit;
  * This class is instantiated and invoked when an AST transformation is
  * activated. For Global AST Transformations, this interface is called once per SourceUnit, which is usually a
  * Groovy source file. For Local AST Transformations, this interface is invoked once every time the Local annotation
- * marker is encountered. <br/><br/>
- *
+ * marker is encountered.
+ * <p>
  * You must annotate this class with {@link GroovyASTTransformation} so that Groovy knows which
  * {@link org.codehaus.groovy.control.CompilePhase} to run in.
  *

@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.runtime;
 
@@ -31,7 +34,6 @@ import java.util.Map;
  * Test the property access of the Invoker class
  *
  * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @version $Revision$
  */
 public class PropertyTest extends GroovyTestCase {
 
@@ -54,22 +56,6 @@ public class PropertyTest extends GroovyTestCase {
         assertGetSetProperty(bean, "dynamicFoo", null, "aValue");
         assertGetSetProperty(bean, "dynamicFoo", "aValue", "NewValue");
     }
-
-    /**
-     * todo this is no longer possible in new groovy
-     * public void testUsingMethodProperty() throws Exception {
-     * DummyBean bean = new DummyBean();
-     * <p/>
-     * assertGetSetProperty(bean, "name", "James", "Bob");
-     * <p/>
-     * Object value = InvokerHelper.getProperty(bean, "getName");
-     * assertTrue("Should have returned a closure: " + value, value instanceof Closure);
-     * Closure closure = (Closure) value;
-     * Object result = closure.call(null);
-     * assertEquals("Result of call to closure", "Bob", result);
-     * }
-     */
-
 
     public void testStaticProperty() throws Exception {
         Object value = InvokerHelper.getProperty(System.class, "out");
@@ -94,19 +80,6 @@ public class PropertyTest extends GroovyTestCase {
         Object value = InvokerHelper.getProperty(entry, "value");
         assertEquals("value property", "x", value);
     }
-
-    /**
-     * todo this is no longer possible in new groovy
-     * public void testMethodProperty() throws Exception {
-     * Object value = InvokerHelper.getProperty(this, "getCheese");
-     * assertTrue("Should have returned a closure: " + value, value instanceof Closure);
-     * <p/>
-     * Object result = ((Closure) value).call();
-     * assertEquals("result of closure call", getCheese(), result);
-     * <p/>
-     * System.out.println("Closure: " + value + " and cheese: " + result);
-     * }
-     */
 
     public void testListCoercionProperty() throws Exception {
         DummyBean bean = new DummyBean();
@@ -184,12 +157,11 @@ public class PropertyTest extends GroovyTestCase {
     }
 
     public void testUsingInPropertyOnProcessViaGroovyMethod() throws Exception {
-        Process process = ProcessGroovyMethods.execute(System.getProperty("java.home") + "/bin/java -version");
+        String[] java = {System.getProperty("java.home") + "/bin/java", "-version"};
+        Process process = ProcessGroovyMethods.execute(java);
         Object value = InvokerHelper.getProperty(process, "in");
         assertNotNull(value);
-
         System.out.println("Found in: " + value);
-
         process.destroy();
     }
 

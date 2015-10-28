@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.runtime.metaclass;
 
@@ -22,21 +25,16 @@ import org.codehaus.groovy.reflection.*;
 import org.codehaus.groovy.runtime.*;
 import org.codehaus.groovy.runtime.m12n.ExtensionModule;
 import org.codehaus.groovy.runtime.m12n.ExtensionModuleRegistry;
-import org.codehaus.groovy.runtime.m12n.StandardPropertiesModuleFactory;
+import org.codehaus.groovy.runtime.m12n.ExtensionModuleScanner;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 import org.codehaus.groovy.util.FastArray;
 import org.codehaus.groovy.util.ManagedLinkedList;
 import org.codehaus.groovy.util.ReferenceBundle;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.net.URL;
 import java.util.*;
-
-import static org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport.closeQuietly;
 
 /**
  * A registry of MetaClass instances which caches introspection &
@@ -49,20 +47,22 @@ import static org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport.closeQuiet
  * @author Graeme Rocher
  * @author Alex Tkachman
  *
- * @version $Revision$
  */
 public class MetaClassRegistryImpl implements MetaClassRegistry{
-    public final static String MODULE_META_INF_FILE = "META-INF/services/org.codehaus.groovy.runtime.ExtensionModule";
+    /**
+     * @deprecated Use {@link ExtensionModuleScanner#MODULE_META_INF_FILE instead}
+     */
+    public static final String MODULE_META_INF_FILE = "META-INF/services/org.codehaus.groovy.runtime.ExtensionModule";
 
-    private boolean useAccessible;
+    private final boolean useAccessible;
 
-    private FastArray instanceMethods = new FastArray();
-    private FastArray staticMethods = new FastArray();
+    private final FastArray instanceMethods = new FastArray();
+    private final FastArray staticMethods = new FastArray();
 
-    private LinkedList<MetaClassRegistryChangeEventListener> changeListenerList = new LinkedList();
-    private LinkedList<MetaClassRegistryChangeEventListener> nonRemoveableChangeListenerList = new LinkedList();
-    private ManagedLinkedList metaClassInfo = new ManagedLinkedList<MetaClass>(ReferenceBundle.getWeakBundle());
-    private ExtensionModuleRegistry moduleRegistry = new ExtensionModuleRegistry();
+    private final LinkedList<MetaClassRegistryChangeEventListener> changeListenerList = new LinkedList<MetaClassRegistryChangeEventListener>();
+    private final LinkedList<MetaClassRegistryChangeEventListener> nonRemoveableChangeListenerList = new LinkedList<MetaClassRegistryChangeEventListener>();
+    private final ManagedLinkedList metaClassInfo = new ManagedLinkedList<MetaClass>(ReferenceBundle.getWeakBundle());
+    private final ExtensionModuleRegistry moduleRegistry = new ExtensionModuleRegistry();
 
     public static final int LOAD_DEFAULT = 0;
     public static final int DONT_LOAD_DEFAULT = 1;
@@ -89,7 +89,7 @@ public class MetaClassRegistryImpl implements MetaClassRegistry{
         this.useAccessible = useAccessible;
 
         if (loadDefault == LOAD_DEFAULT) {
-            Map<CachedClass, List<MetaMethod>> map = new HashMap<CachedClass, List<MetaMethod>>();
+            final Map<CachedClass, List<MetaMethod>> map = new HashMap<CachedClass, List<MetaMethod>>();
 
             // let's register the default methods
             registerMethods(null, true, true, map);
@@ -108,7 +108,8 @@ public class MetaClassRegistryImpl implements MetaClassRegistry{
                 registerMethods(plugin, false, false, map);
             }
 
-            registerClasspathModules(map, this.getClass().getClassLoader());
+            ExtensionModuleScanner scanner = new ExtensionModuleScanner(new DefaultModuleListener(map), this.getClass().getClassLoader());
+            scanner.scanClasspathModules();
 
             refreshMopMethods(map);
 
@@ -148,62 +149,9 @@ public class MetaClassRegistryImpl implements MetaClassRegistry{
         }
     }
 
-    private void registerClasspathModules(final Map<CachedClass, List<MetaMethod>> map, final ClassLoader classLoader) {
-        try {
-            Enumeration<URL> resources = classLoader.getResources(MODULE_META_INF_FILE);
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                registerExtensionModuleFromMetaInf(url, map, classLoader);
-            }
-        } catch (IOException e) {
-            // DO NOTHING
-        }
-    }
-
-    private void registerExtensionModuleFromMetaInf(final URL metadata, final Map<CachedClass, List<MetaMethod>> map, final ClassLoader classLoader) {
-        Properties properties = new Properties();
-        InputStream inStream = null;
-        try {
-            inStream = metadata.openStream();
-            properties.load(inStream);
-        } catch (IOException e) {
-            throw new GroovyRuntimeException("Unable to load module META-INF descriptor", e);
-        } finally {
-            closeQuietly(inStream);
-        }
-        registerExtensionModuleFromProperties(properties, classLoader, map);
-    }
-
     public void registerExtensionModuleFromProperties(final Properties properties, final ClassLoader classLoader, final Map<CachedClass, List<MetaMethod>> map) {
-        StandardPropertiesModuleFactory factory = new StandardPropertiesModuleFactory();
-        ExtensionModule module = factory.newModule(properties, classLoader);
-        if (moduleRegistry.hasModule(module.getName())) {
-            ExtensionModule loadedModule = moduleRegistry.getModule(module.getName());
-            if (loadedModule.getVersion().equals(module.getVersion())) {
-                // already registered
-                return;
-            } else {
-                throw new GroovyRuntimeException("Conflicting module versions. Module ["+module.getName()+" is loaded in version "+
-                loadedModule.getVersion()+" and you are trying to load version "+module.getVersion());
-            }
-        }
-        moduleRegistry.addModule(module);
-        // register MetaMethods
-        List<MetaMethod> metaMethods = module.getMetaMethods();
-        for (MetaMethod metaMethod : metaMethods) {
-            CachedClass cachedClass = metaMethod.getDeclaringClass();
-            List<MetaMethod> methods = map.get(cachedClass);
-            if (methods==null) {
-                methods = new ArrayList<MetaMethod>(4);
-                map.put(cachedClass, methods);
-            }
-            methods.add(metaMethod);
-            if (metaMethod.isStatic()) {
-                staticMethods.add(metaMethod);
-            } else {
-                instanceMethods.add(metaMethod);
-            }
-        }
+        ExtensionModuleScanner scanner = new ExtensionModuleScanner(new DefaultModuleListener(map), classLoader);
+        scanner.scanExtensionModuleFromProperties(properties);
     }
 
     public ExtensionModuleRegistry getModuleRegistry() {
@@ -544,5 +492,43 @@ public class MetaClassRegistryImpl implements MetaClassRegistry{
                 currentMeta = null;
             }
         };
+    }
+
+    private class DefaultModuleListener implements ExtensionModuleScanner.ExtensionModuleListener {
+        private final Map<CachedClass, List<MetaMethod>> map;
+
+        public DefaultModuleListener(final Map<CachedClass, List<MetaMethod>> map) {
+            this.map = map;
+        }
+
+        public void onModule(final ExtensionModule module) {
+            if (moduleRegistry.hasModule(module.getName())) {
+            ExtensionModule loadedModule = moduleRegistry.getModule(module.getName());
+            if (loadedModule.getVersion().equals(module.getVersion())) {
+                // already registered
+                return;
+            } else {
+                throw new GroovyRuntimeException("Conflicting module versions. Module ["+module.getName()+" is loaded in version "+
+                        loadedModule.getVersion()+" and you are trying to load version "+module.getVersion());
+            }
+        }
+            moduleRegistry.addModule(module);
+            // register MetaMethods
+            List<MetaMethod> metaMethods = module.getMetaMethods();
+            for (MetaMethod metaMethod : metaMethods) {
+                CachedClass cachedClass = metaMethod.getDeclaringClass();
+                List<MetaMethod> methods = map.get(cachedClass);
+                if (methods==null) {
+                    methods = new ArrayList<MetaMethod>(4);
+                    map.put(cachedClass, methods);
+                }
+                methods.add(metaMethod);
+                if (metaMethod.isStatic()) {
+                    staticMethods.add(metaMethod);
+                } else {
+                    instanceMethods.add(metaMethod);
+                }
+            }
+        }
     }
 }

@@ -1,17 +1,20 @@
 /*
- * Copyright 2003-2012 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools.groovydoc
 
@@ -36,6 +39,7 @@ class Main {
     private static String header
     private static String footer
     private static String charset
+    private static String fileEncoding
     private static Boolean author
     private static Boolean noScripts
     private static Boolean noMainForScripts
@@ -73,6 +77,7 @@ class Main {
         cli.package(messages['cli.option.package.description'])
         cli.private(messages['cli.option.private.description'])
         cli.charset(args:1, argName: 'charset', messages['cli.option.charset.description'])
+        cli.fileEncoding(args:1, argName: 'charset', messages['cli.option.fileEncoding.description'])
         cli.windowtitle(args:1, argName: 'text', messages['cli.option.windowtitle.description'])
         cli.doctitle(args:1, argName: 'html', messages['cli.option.doctitle.description'])
         cli.header(args:1, argName: 'html', messages['cli.option.header.description'])
@@ -141,6 +146,7 @@ class Main {
         header = options.header ?: ''
         footer = options.footer ?: ''
         charset = options.charset ?: ''
+        fileEncoding = options.fileEncoding ?: ''
 
         if (options.Ds) {
             def values = options.Ds
@@ -177,6 +183,7 @@ class Main {
         properties.put("footer", footer)
         properties.put("header", header)
         properties.put("charset", charset)
+        properties.put("fileEncoding", fileEncoding)
         properties.put("privateScope", privateScope.toString())
         properties.put("protectedScope", protectedScope.toString())
         properties.put("publicScope", publicScope.toString())

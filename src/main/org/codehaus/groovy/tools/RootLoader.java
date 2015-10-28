@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools;
 
@@ -30,14 +33,14 @@ import java.util.Map;
  * Classloaders are ignored first. If a class or resource
  * can't be found in the classpath of the RootLoader, then parent is
  * checked.
- * <p/>
+ * <p>
  * <b>Note:</b> this is very against the normal behavior of
  * classloaders. Normal is to first check parent and then look in
  * the resources you gave this classloader.
- * <p/>
+ * <p>
  * It's possible to add urls to the classpath at runtime through
  * {@link <a href="#addURL(URL)">addURL(URL)</a>}
- * <p/>
+ * <p>
  * <b>Why using RootLoader?</b>
  * If you have to load classes with multiple classloaders and a
  * classloader does know a class which depends on a class only
@@ -46,9 +49,9 @@ import java.util.Map;
  * to redirect it's search for the class to the parent first.
  * That way the child can load the class. If the child does not
  * have all classes to do this, this fails of course.
- * <p/>
+ * <p>
  * For example:
- * <p/>
+ * <p>
  * <pre>
  *       parentLoader   (has classpath: a.jar;c.jar)
  *           |
@@ -72,6 +75,7 @@ import java.util.Map;
  */
 public class RootLoader extends URLClassLoader {
 
+    private static final URL[] EMPTY_URL_ARRAY = new URL[0];
     private Map<String, Class> customClasses = new HashMap<String, Class>();
 
     /**
@@ -80,7 +84,7 @@ public class RootLoader extends URLClassLoader {
      * @param parent the parent Loader
      */
     private RootLoader(ClassLoader parent) {
-        this(new URL[0], parent);
+        this(EMPTY_URL_ARRAY, parent);
     }
 
     /**

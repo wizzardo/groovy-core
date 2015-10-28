@@ -1,26 +1,32 @@
-/*
- * Copyright 2003-2013 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package org.codehaus.groovy.tools;
 
+import groovy.lang.Binding;
 import groovy.lang.GroovyResourceLoader;
+import groovy.lang.GroovyShell;
 import org.apache.commons.cli.*;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ConfigurationException;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
+import org.codehaus.groovy.runtime.DefaultGroovyStaticMethods;
 import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit;
 
 import groovy.lang.GroovySystem;
@@ -68,7 +74,7 @@ public class FileSystemCompiler {
     public static void displayVersion() {
         String version = GroovySystem.getVersion();
         System.err.println("Groovy compiler version " + version);
-        System.err.println("Copyright 2003-2013 The Codehaus. http://groovy.codehaus.org/");
+        System.err.println("Copyright 2003-2015 The Apache Software Foundation. http://groovy-lang.org/");
         System.err.println("");
     }
 
@@ -110,7 +116,7 @@ public class FileSystemCompiler {
     public static void commandLineCompile(String[] args, boolean lookupUnnamedFiles) throws Exception {
         Options options = createCompilationOptions();
 
-        CommandLineParser cliParser = new GroovyPosixParser();
+        CommandLineParser cliParser = new GroovyInternalPosixParser();
 
         CommandLine cli;
         cli = cliParser.parse(options, args);
@@ -148,7 +154,7 @@ public class FileSystemCompiler {
     /**
      * Primary entry point for compiling from the command line
      * (using the groovyc script).
-     * <p/>
+     * <p>
      * If calling inside a process and you don't want the JVM to exit on an
      * error call commandLineCompile(String[]), which this method simply wraps
      *
@@ -161,7 +167,7 @@ public class FileSystemCompiler {
     /**
      * Primary entry point for compiling from the command line
      * (using the groovyc script).
-     * <p/>
+     * <p>
      * If calling inside a process and you don't want the JVM to exit on an
      * error call commandLineCompile(String[]), which this method simply wraps
      *
@@ -187,8 +193,9 @@ public class FileSystemCompiler {
         // if there are any joint compilation options set stubDir if not set
         try {
             if ((configuration.getJointCompilationOptions() != null)
-                    && !configuration.getJointCompilationOptions().containsKey("stubDir")) {
-                tmpDir = createTempDir();
+                && !configuration.getJointCompilationOptions().containsKey("stubDir"))
+            {
+                tmpDir = DefaultGroovyStaticMethods.createTempDir(null, "groovy-generated-", "-java-source");
                 configuration.getJointCompilationOptions().put("stubDir", tmpDir);
             }
             FileSystemCompiler compiler = new FileSystemCompiler(configuration, unit);
@@ -244,7 +251,7 @@ public class FileSystemCompiler {
         }
     }
 
-    public static CompilerConfiguration generateCompilerConfigurationFromOptions(CommandLine cli) {
+    public static CompilerConfiguration generateCompilerConfigurationFromOptions(CommandLine cli) throws IOException {
         //
         // Setup the configuration data
 
@@ -262,8 +269,8 @@ public class FileSystemCompiler {
             configuration.setSourceEncoding(cli.getOptionValue("encoding"));
         }
 
-        if (cli.hasOption("baseScript")) {
-            configuration.setScriptBaseClass(cli.getOptionValue("baseScript"));
+        if (cli.hasOption("basescript")) {
+            configuration.setScriptBaseClass(cli.getOptionValue("basescript"));
         }
 
         // joint compilation parameters
@@ -284,6 +291,21 @@ public class FileSystemCompiler {
             configuration.getOptimizationOptions().put("indy", true);
         }
 
+        if (cli.hasOption("configscript")) {
+            String path = cli.getOptionValue("configscript");
+            File groovyConfigurator = new File(path);
+            Binding binding = new Binding();
+            binding.setVariable("configuration", configuration);
+
+            CompilerConfiguration configuratorConfig = new CompilerConfiguration();
+            ImportCustomizer customizer = new ImportCustomizer();
+            customizer.addStaticStars("org.codehaus.groovy.control.customizers.builder.CompilerCustomizationBuilder");
+            configuratorConfig.addCompilationCustomizers(customizer);
+
+            GroovyShell shell = new GroovyShell(binding, configuratorConfig);
+            shell.evaluate(groovyConfigurator);
+        }
+        
         return configuration;
     }
 
@@ -305,7 +327,7 @@ public class FileSystemCompiler {
         options.addOption(OptionBuilder.withLongOpt("version").withDescription("Print the version").create('v'));
         options.addOption(OptionBuilder.withLongOpt("exception").withDescription("Print stack trace on error").create('e'));
         options.addOption(OptionBuilder.withLongOpt("jointCompilation").withDescription("Attach javac compiler to compile .java files").create('j'));
-        options.addOption(OptionBuilder.withLongOpt("baseScript").hasArg().withArgName("class").withDescription("Base class name for scripts (must derive from Script)").create('b'));
+        options.addOption(OptionBuilder.withLongOpt("basescript").hasArg().withArgName("class").withDescription("Base class name for scripts (must derive from Script)").create('b'));
 
         options.addOption(
                 OptionBuilder.withArgName("property=value")
@@ -320,46 +342,19 @@ public class FileSystemCompiler {
                         .create("F"));
 
         options.addOption(OptionBuilder.withLongOpt("indy").withDescription("enables compilation using invokedynamic").create());
-
+        options.addOption(OptionBuilder.withLongOpt("configscript").hasArg().withDescription("A script for tweaking the configuration options").create());
         return options;
     }
 
+    /**
+     * Creates a temporary directory in the default temporary directory (as specified by the system
+     * property <i>java.io.tmpdir</i>.
+     *
+     * @deprecated Use {@link DefaultGroovyStaticMethods#createTempDir(java.io.File, String, String)} instead.
+     */
+    @Deprecated
     public static File createTempDir() throws IOException {
-        final int MAXTRIES = 3;
-        int accessDeniedCounter = 0;
-        File tempFile = null;
-        for (int i = 0; i < MAXTRIES; i++) {
-            try {
-                tempFile = File.createTempFile("groovy-generated-", "-java-source");
-                tempFile.delete();
-                tempFile.mkdirs();
-                break;
-            } catch (IOException ioe) {
-                if (ioe.getMessage().startsWith("Access is denied")) {
-                    accessDeniedCounter++;
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        /* ignore */
-                    }
-                }
-                if (i == MAXTRIES - 1) {
-                    if (accessDeniedCounter == MAXTRIES) {
-                        String msg =
-                                "Access is denied.\nWe tried " + accessDeniedCounter +
-                                        " times to create a temporary directory" +
-                                        " and failed each time. If you are on Windows" +
-                                        " you are possibly victim to" +
-                                        " http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6325169. " +
-                                        " this is not a bug in Groovy.";
-                        throw new IOException(msg);
-                    } else {
-                        throw ioe;
-                    }
-                }
-            }
-        }
-        return tempFile;
+        return DefaultGroovyStaticMethods.createTempDir(null);
     }
 
     public static void deleteRecursive(File file) {

@@ -1,25 +1,26 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.lang;
 
 import org.codehaus.groovy.reflection.ReflectionCache;
 import org.codehaus.groovy.reflection.stdclasses.CachedClosureClass;
-import org.codehaus.groovy.runtime.ComposedClosure;
-import org.codehaus.groovy.runtime.CurriedClosure;
-import org.codehaus.groovy.runtime.InvokerHelper;
+import org.codehaus.groovy.runtime.*;
 import org.codehaus.groovy.runtime.callsite.BooleanClosureWrapper;
 import org.codehaus.groovy.runtime.memoize.LRUCache;
 import org.codehaus.groovy.runtime.memoize.Memoize;
@@ -32,7 +33,7 @@ import java.io.Writer;
 
 /**
  * Represents any closure object in Groovy.
- * <p/>
+ * <p>
  * Groovy allows instances of Closures to be called in a
  * short form. For example:
  * <pre>
@@ -62,7 +63,7 @@ import java.io.Writer;
 public abstract class Closure<V> extends GroovyObjectSupport implements Cloneable, Runnable, GroovyCallable<V>, Serializable {
 
     /**
-     * With this resolveStrategy set the closure will attempt to resolve property references to the
+     * With this resolveStrategy set the closure will attempt to resolve property references and methods to the
      * owner first, then the delegate (<b>this is the default strategy</b>).
      *
      * For example the following code :
@@ -96,7 +97,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     public static final int OWNER_FIRST = 0;
 
     /**
-     * With this resolveStrategy set the closure will attempt to resolve property references to the
+     * With this resolveStrategy set the closure will attempt to resolve property references and methods to the
      * delegate first then the owner.
      *
      * For example the following code :
@@ -131,7 +132,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     public static final int DELEGATE_FIRST = 1;
 
     /**
-     * With this resolveStrategy set the closure will resolve property references to the owner only
+     * With this resolveStrategy set the closure will resolve property references and methods to the owner only
      * and not call the delegate at all. For example the following code :
      *
      * <pre>
@@ -161,7 +162,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     public static final int OWNER_ONLY = 2;
 
     /**
-     * With this resolveStrategy set the closure will resolve property references to the delegate
+     * With this resolveStrategy set the closure will resolve property references and methods to the delegate
      * only and entirely bypass the owner. For example the following code :
      *
      * <pre>
@@ -193,9 +194,9 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
 
     /**
      * With this resolveStrategy set the closure will resolve property references to itself and go
-     * through the usual MetaClass look-up process. This means that properties are neither resolved from
-     * the owner nor the delegate, but only on the closure object itself. This allows the developer to override
-     * getProperty using ExpandoMetaClass of the closure itself.<p>
+     * through the usual MetaClass look-up process. This means that properties and methods are neither resolved
+     * from the owner nor the delegate, but only on the closure object itself. This allows the developer to
+     * override getProperty using ExpandoMetaClass of the closure itself.<p>
      * <i>Note that local variables are always looked up first, independently of the resolution strategy.</i>
      */
     public static final int TO_SELF = 4;
@@ -239,7 +240,8 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     }
 
     /**
-     * Sets the strategy which the closure uses to resolve property references. The default is Closure.OWNER_FIRST
+     * Sets the strategy which the closure uses to resolve property references and methods.
+     * The default is Closure.OWNER_FIRST
      *
      * @param resolveStrategy The resolve strategy to set
      *
@@ -320,6 +322,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         try {
             // let's try getting the property on the first object
             return InvokerHelper.getProperty(firstTry, property);
+
         } catch (MissingPropertyException e1) {
             if (secondTry != null && firstTry != this && firstTry != secondTry) {
                 try {
@@ -330,6 +333,17 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
                 }
             }
             throw e1;
+
+        } catch (MissingFieldException e2)  { // see GROOVY-5875
+            if (secondTry != null && firstTry != this && firstTry != secondTry) {
+                try {
+                    // let's try getting the property on the second object
+                    return InvokerHelper.getProperty(secondTry, property);
+                } catch (GroovyRuntimeException e3) {
+                    // ignore, we'll throw e2
+                }
+            }
+            throw e2;
         }
     }
 
@@ -410,7 +424,10 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     public V call(Object... args) {
         try {
             return (V) getMetaClass().invokeMethod(this,"doCall",args);
-        } catch (Exception e) {
+        } catch (InvokerInvocationException e) {
+            ExceptionUtils.sneakyThrow(e.getCause());
+            return null; // unreachable statement
+        }  catch (Exception e) {
             return (V) throwRuntimeException(e);
         }
     }
@@ -616,7 +633,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
 
     /**
      * Support for Closure forward composition.
-     * <p/>
+     * <p>
      * Typical usage:
      * <pre>
      * def twice = { a -> a * 2 }
@@ -635,7 +652,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
 
     /**
      * Support for Closure reverse composition.
-     * <p/>
+     * <p>
      * Typical usage:
      * <pre>
      * def twice = { a -> a * 2 }
@@ -654,7 +671,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
 
     /* *
      * Alias for calling a Closure for non-closure arguments.
-     * <p/>
+     * <p>
      * Typical usage:
      * <pre>
      * def twice = { a -> a * 2 }

@@ -1,17 +1,20 @@
 /*
- * Copyright 2007 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.swing.factory
 
@@ -21,13 +24,13 @@ import javax.swing.border.Border
 import javax.swing.border.TitledBorder
 
 /**
- * The node must be called with either a value argument or a title: attribute. <br />
- * The following attributes are optional. <br />
- *    position: one of "default", "aboveTop", "top", "belowTop", "aboveBottom", "bottom", "belowBottom", or a constant from javax.swing.border.TitledBorder
- *    justification: one of "default", "left", "center", "right", "leading", "trailing", or a constant from javax.swing.border.TitledBorder
- *    border: javax.swing.Border, some other border, if unset the look and feel default will be used (re
- *    color: java.awt.Color the color of the text for the title
- *    font: java.awt.Font the font of the text for the title
+ * The node must be called with either a value argument or a title: attribute. <br>
+ * The following attributes are optional. <br>
+ * position: one of "default", "aboveTop", "top", "belowTop", "aboveBottom", "bottom", "belowBottom", or a constant from javax.swing.border.TitledBorder<br>
+ * justification: one of "default", "left", "center", "right", "leading", "trailing", or a constant from javax.swing.border.TitledBorder<br>
+ * border: javax.swing.Border, some other border, if unset the look and feel default will be used<br>
+ * color: java.awt.Color the color of the text for the title<br>
+ * font: java.awt.Font the font of the text for the title
  */
 class TitledBorderFactory extends SwingBorderFactory {
 

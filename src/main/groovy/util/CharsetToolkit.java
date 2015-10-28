@@ -1,19 +1,21 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.util;
 
 import java.io.*;
@@ -21,15 +23,15 @@ import java.nio.charset.Charset;
 import java.util.Collection;
 
 /**
- * <p>Utility class to guess the encoding of a given text file.</p>
- *
- * <p>Unicode files encoded in UTF-16 (low or big endian) or UTF-8 files
+ * Utility class to guess the encoding of a given text file.
+ * <p>
+ * Unicode files encoded in UTF-16 (low or big endian) or UTF-8 files
  * with a Byte Order Marker are correctly discovered. For UTF-8 files with no BOM, if the buffer
- * is wide enough, the charset should also be discovered.</p>
- *
- * <p>A byte buffer of 4KB is used to be able to guess the encoding.</p>
- *
- * <p>Usage:</p>
+ * is wide enough, the charset should also be discovered.
+ * <p>
+ * A byte buffer of 4KB is used to be able to guess the encoding.
+ * <p>
+ * Usage:
  * <pre>
  * CharsetToolkit toolkit = new CharsetToolkit(file);
  *
@@ -136,16 +138,16 @@ public class CharsetToolkit {
     }
 
     /**
-     * <p>Guess the encoding of the provided buffer.</p>
+     * Guess the encoding of the provided buffer.
      * If Byte Order Markers are encountered at the beginning of the buffer, we immediately
      * return the charset implied by this BOM. Otherwise, the file would not be a human
-     * readable text file.</p>
-     *
-     * <p>If there is no BOM, this method tries to discern whether the file is UTF-8 or not.
+     * readable text file.
+     * <p>
+     * If there is no BOM, this method tries to discern whether the file is UTF-8 or not.
      * If it is not UTF-8, we assume the encoding is the default system encoding
-     * (of course, it might be any 8-bit charset, but usually, an 8-bit charset is the default one).</p>
-     *
-     * <p>It is possible to discern UTF-8 thanks to the pattern of characters with a multi-byte sequence.</p>
+     * (of course, it might be any 8-bit charset, but usually, an 8-bit charset is the default one).
+     * <p>
+     * It is possible to discern UTF-8 thanks to the pattern of characters with a multi-byte sequence.
      * <pre>
      * UCS-4 range (hex.)        UTF-8 octet sequence (binary)
      * 0000 0000-0000 007F       0xxxxxxx
@@ -155,7 +157,7 @@ public class CharsetToolkit {
      * 0020 0000-03FF FFFF       111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
      * 0400 0000-7FFF FFFF       1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
      * </pre>
-     * <p>With UTF-8, 0xFE and 0xFF never appear.</p>
+     * With UTF-8, 0xFE and 0xFF never appear.
      *
      * @return the Charset recognized.
      */
@@ -195,7 +197,7 @@ public class CharsetToolkit {
                 // a two-bytes sequence was encountered
                 if (isTwoBytesSequence(b0)) {
                     // there must be one continuation byte of the form 10xxxxxx,
-                    // otherwise the following characteris is not a valid UTF-8 construct
+                    // otherwise the following character is is not a valid UTF-8 construct
                     if (!isContinuationChar(b1))
                         validU8Char = false;
                     else
@@ -204,7 +206,7 @@ public class CharsetToolkit {
                 // a three-bytes sequence was encountered
                 else if (isThreeBytesSequence(b0)) {
                     // there must be two continuation bytes of the form 10xxxxxx,
-                    // otherwise the following characteris is not a valid UTF-8 construct
+                    // otherwise the following character is is not a valid UTF-8 construct
                     if (!(isContinuationChar(b1) && isContinuationChar(b2)))
                         validU8Char = false;
                     else
@@ -213,7 +215,7 @@ public class CharsetToolkit {
                 // a four-bytes sequence was encountered
                 else if (isFourBytesSequence(b0)) {
                     // there must be three continuation bytes of the form 10xxxxxx,
-                    // otherwise the following characteris is not a valid UTF-8 construct
+                    // otherwise the following character is is not a valid UTF-8 construct
                     if (!(isContinuationChar(b1) && isContinuationChar(b2) && isContinuationChar(b3)))
                         validU8Char = false;
                     else
@@ -222,7 +224,7 @@ public class CharsetToolkit {
                 // a five-bytes sequence was encountered
                 else if (isFiveBytesSequence(b0)) {
                     // there must be four continuation bytes of the form 10xxxxxx,
-                    // otherwise the following characteris is not a valid UTF-8 construct
+                    // otherwise the following character is is not a valid UTF-8 construct
                     if (!(isContinuationChar(b1)
                         && isContinuationChar(b2)
                         && isContinuationChar(b3)
@@ -234,7 +236,7 @@ public class CharsetToolkit {
                 // a six-bytes sequence was encountered
                 else if (isSixBytesSequence(b0)) {
                     // there must be five continuation bytes of the form 10xxxxxx,
-                    // otherwise the following characteris is not a valid UTF-8 construct
+                    // otherwise the following character is is not a valid UTF-8 construct
                     if (!(isContinuationChar(b1)
                         && isContinuationChar(b2)
                         && isContinuationChar(b3)

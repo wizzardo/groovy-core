@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.ast.expr;
 
@@ -24,13 +27,13 @@ import org.codehaus.groovy.syntax.Token;
  * declared by name with an expression like "def foo" or with type "String foo". However, 
  * the multiple assignment feature allows you to create two or more variables using
  * an expression like: <code>def (x, y) = [1, 2]</code>.
- * <p/>
+ * <p>
  * You can access the left hand side of a declaration using the
  * "<code>Expression getLeftExpression()</code>" method. In which case you might then
  * use <code>instanceof</code> and casting to perform operations specific to a
  * single local variable (<code>VariableExpression</code>) or for the multiple
  * assignment case (<code>TupleExpression</code>).
- * <p/>
+ * <p>
  * Alternatively, if <code>isMultipleAssignmentDeclaration()</code> is <code>false</code>
  * you can use the method "<code>VariableExpression getVariableExpression()</code>" method.
  * Similarly, if <code>isMultipleAssignmentDeclaration()</code> is <code>true</code>
@@ -40,7 +43,6 @@ import org.codehaus.groovy.syntax.Token;
  *
  * @author Jochen Theodorou
  * @author Hamlet D'Arcy
- * @version $Revision$
  */
 public class DeclarationExpression extends BinaryExpression {
     
@@ -92,12 +94,10 @@ public class DeclarationExpression extends BinaryExpression {
      * This is an unsafe method to call. In a multiple assignment statement, the left hand side will
      * be a TupleExpression and a ClassCastException will occur. If you invoke this method then
      * be sure to invoke isMultipleAssignmentDeclaration() first to check that it is safe to do so. 
-     * If that method returns true then this method is safe to call. 
-     * @return
-     *      left hand side of normal variable declarations
-     * @throws ClassCastException 
-     *      if the left hand side is not a VariableExpression (and is probably a multiple assignment statement).
+     * If that method returns true then this method is safe to call.
      *
+     * @return left hand side of normal variable declarations
+     * @throws ClassCastException if the left hand side is not a VariableExpression (and is probably a multiple assignment statement).
      */
     public VariableExpression getVariableExpression() {
         return (VariableExpression) this.getLeftExpression();

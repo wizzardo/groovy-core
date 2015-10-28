@@ -1,26 +1,32 @@
-/*
- * Copyright 2003-2009 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.transform.sc.transformers;
 
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.classgen.AsmClassGenerator;
+import org.codehaus.groovy.classgen.asm.BytecodeHelper;
+import org.codehaus.groovy.classgen.asm.OperandStack;
 import org.codehaus.groovy.classgen.asm.WriterController;
 import org.codehaus.groovy.classgen.asm.sc.StaticTypesTypeChooser;
 import org.codehaus.groovy.transform.stc.ExtensionMethodNode;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
 import java.lang.reflect.Modifier;
@@ -49,7 +55,6 @@ public class BooleanExpressionTransformer {
             transformed.setSourcePosition(booleanExpression);
             transformed.copyNodeMetaData(booleanExpression);
             return transformed;
-
         }
         return transformer.superTransform(booleanExpression);
     }
@@ -90,44 +95,60 @@ public class BooleanExpressionTransformer {
             if (visitor instanceof AsmClassGenerator) {
                 AsmClassGenerator acg = (AsmClassGenerator) visitor;
                 WriterController controller = acg.getController();
+                OperandStack os = controller.getOperandStack();
+
                 if (type.equals(ClassHelper.boolean_TYPE)) {
                     expression.visit(visitor);
-                    controller.getOperandStack().doGroovyCast(ClassHelper.boolean_TYPE);
+                    os.doGroovyCast(ClassHelper.boolean_TYPE);
                     return;
                 }
                 if (type.equals(ClassHelper.Boolean_TYPE)) {
+                    MethodVisitor mv = controller.getMethodVisitor();
                     expression.visit(visitor);
+                    Label unbox = new Label();
+                    Label exit = new Label();
+                    // check for null
+                    mv.visitInsn(DUP);
+                    mv.visitJumpInsn(IFNONNULL, unbox);
+                    mv.visitInsn(POP);
+                    mv.visitInsn(ICONST_0);
+                    mv.visitJumpInsn(GOTO, exit);
+                    mv.visitLabel(unbox);
                     // unbox
-                    MethodVisitor mv = controller.getMethodVisitor();
-                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z");
-                    controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
+                    // GROOVY-6270
+                    if (!os.getTopOperand().equals(type)) BytecodeHelper.doCast(mv, type);
+                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false);
+                    mv.visitLabel(exit);
+                    os.replace(ClassHelper.boolean_TYPE);
                     return;
                 }
-                if (type.equals(ClassHelper.int_TYPE) || type.equals(ClassHelper.byte_TYPE)
-                        || type.equals(ClassHelper.short_TYPE) || type.equals(ClassHelper.char_TYPE)) {
-                    // int on stack
+                ClassNode top = type;
+                if (ClassHelper.isPrimitiveType(top)) {
                     expression.visit(visitor);
-                    return;
-                } else if (type.equals(ClassHelper.long_TYPE)) {
-                    expression.visit(visitor);
-                    MethodVisitor mv = controller.getMethodVisitor();
-                    mv.visitInsn(L2I);
-                    controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
-                    return;
-                } else if (type.equals(ClassHelper.float_TYPE)) {
-                    expression.visit(visitor);
-                    MethodVisitor mv = controller.getMethodVisitor();
-                    mv.visitInsn(F2I);
-                    controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
-                    return;
-                } else if (type.equals(ClassHelper.double_TYPE)) {
-                    expression.visit(visitor);
-                    MethodVisitor mv = controller.getMethodVisitor();
-                    mv.visitInsn(D2I);
-                    controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
-                    return;
+                    // in case of null safe invocation, it is possible that what was supposed to be a primitive type
+                    // becomes the "null" constant, so we need to recheck
+                    top = controller.getOperandStack().getTopOperand();
+                    if (ClassHelper.isPrimitiveType(top)) {
+                        if (top.equals(ClassHelper.int_TYPE) || top.equals(ClassHelper.byte_TYPE)
+                                || top.equals(ClassHelper.short_TYPE) || top.equals(ClassHelper.char_TYPE)) {
+                            // int on stack
+                        } else if (top.equals(ClassHelper.long_TYPE)) {
+                            MethodVisitor mv = controller.getMethodVisitor();
+                            mv.visitInsn(L2I);
+                            controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
+                        } else if (top.equals(ClassHelper.float_TYPE)) {
+                            MethodVisitor mv = controller.getMethodVisitor();
+                            mv.visitInsn(F2I);
+                            controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
+                        } else if (top.equals(ClassHelper.double_TYPE)) {
+                            MethodVisitor mv = controller.getMethodVisitor();
+                            mv.visitInsn(D2I);
+                            controller.getOperandStack().replace(ClassHelper.boolean_TYPE);
+                        }
+                        return;
+                    }
                 }
-                List<MethodNode> asBoolean = findDGMMethodsByNameAndArguments(type, "asBoolean", ClassNode.EMPTY_ARRAY);
+                List<MethodNode> asBoolean = findDGMMethodsByNameAndArguments(controller.getSourceUnit().getClassLoader(), top, "asBoolean", ClassNode.EMPTY_ARRAY);
                 if (asBoolean.size() == 1) {
                     MethodNode node = asBoolean.get(0);
                     if (node instanceof ExtensionMethodNode) {
@@ -140,10 +161,10 @@ public class BooleanExpressionTransformer {
                             // For (2), we check that we are in one of those cases
                             // (a) a final class
                             // (b) a private inner class without subclass
-                            if (Modifier.isFinal(type.getModifiers())
-                                    || (type instanceof InnerClassNode
-                                    && Modifier.isPrivate(type.getModifiers())
-                                    && !isExtended(type, type.getOuterClass().getInnerClasses()))
+                            if (Modifier.isFinal(top.getModifiers())
+                                    || (top instanceof InnerClassNode
+                                    && Modifier.isPrivate(top.getModifiers())
+                                    && !isExtended(top, top.getOuterClass().getInnerClasses()))
                                     ) {
                                 CompareToNullExpression expr = new CompareToNullExpression(
                                         expression, false

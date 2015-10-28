@@ -1,3 +1,21 @@
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
 package groovy
 /**
  * Test case for using the "as" keyword to convert between strings
@@ -81,5 +99,41 @@ class AsTest extends GroovyTestCase {
         assert subject.class == Double
         assert subject == 0.1
     }
+
+    void testGStringAsByte() {
+        subject = "${42}" as byte
+        assert subject.class == Byte // "as" wraps types
+        assert subject == 42
+    }
     
+    void testGStringAsShort() {
+        subject = "${42}" as short
+        assert subject.class == Short // "as" wraps types
+        assert subject == 42
+    }
+
+    void testGStringAsInt() {
+        subject = "${42}" as int
+        assert subject.class == Integer // "as" wraps types
+        assert subject == 42
+    }
+
+    void testGStringAsLong() {
+        subject = "${42}" as long
+        assert subject.class == Long // "as" wraps types
+        assert subject == 42
+    }
+
+    void testGStringAsFloat() {
+        subject = "${42.666}" as float
+        assert subject.class == Float // "as" wraps types
+        assert subject == 42.666f
+    }
+
+    void testGStringAsDouble() {
+        subject = "${42.666}" as double
+        assert subject.class == Double // "as" wraps types
+        assert subject == 42.666d
+    }
+
 }

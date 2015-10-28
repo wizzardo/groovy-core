@@ -1,19 +1,21 @@
-/*
- * Copyright 2003-2011 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-
 package groovy.util;
 
 import groovy.lang.Closure;
@@ -34,16 +36,13 @@ import java.util.ListIterator;
  * will trigger an event (if the value indeed changed), otherwise it won't. The Closure may receive
  * 1 or 2 parameters, the single one being the value, the other one both the key and value, for
  * example:
- * <p/>
  * <pre>
  * // skip all properties whose value is a closure
  * def map = new ObservableList( {!(it instanceof Closure)} )
- * &lt;p/&gt;
+ *
  * // skip all properties whose name matches a regex
  * def map = new ObservableList( { name, value -&gt; !(name =&tilde; /[A-Z+]/) } )
  * </pre>
- * <p/>
- * <p>
  * The current implementation will trigger specialized events in the following scenarios, you need
  * not register a different listener as those events extend from PropertyChangeEvent
  * <ul>
@@ -56,15 +55,12 @@ import java.util.ListIterator;
  * <li>ObservableList.MultiElementRemovedEvent - triggered by calling
  * list.removeAll()/list.retainAll()</li>
  * </ul>
- * </p>
- * <p/>
  * <p>
  * <strong>Bound properties</strong>
  * <ul>
  * <li><tt>content</tt> - read-only.</li>
  * <li><tt>size</tt> - read-only.</li>
  * </ul>
- * </p>
  *
  * @author <a href="mailto:aalmiray@users.sourceforge.net">Andres Almiray</a>
  */

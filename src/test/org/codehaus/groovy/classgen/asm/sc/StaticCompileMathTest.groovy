@@ -1,3 +1,21 @@
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
 package org.codehaus.groovy.classgen.asm.sc
 
 import org.codehaus.groovy.classgen.asm.AbstractBytecodeTestCase
@@ -270,5 +288,44 @@ class StaticCompileMathTest extends AbstractBytecodeTestCase {
             }
             assert foo()==1
         '''
+    }
+
+    void testPrimitiveIntCompareNotEqualShouldUseFastPath() {
+        def source = '''
+        @groovy.transform.CompileStatic
+        boolean cmp(int i, int j) {
+            boolean b = i==j
+            return i!=j
+        }
+        assert cmp(1,1) == false
+        assert cmp(1,2) == true
+        '''
+        assertScript(source)
+        def bytecode = compile(method:'cmp', source)
+        assert bytecode.hasStrictSequence([
+                'ILOAD 1',
+                'ILOAD 2',
+                'IF_ICMPNE'
+        ])
+    }
+
+    void testPrimitiveLongCompareNotEqualShouldUseFastPath() {
+        def source = '''
+        @groovy.transform.CompileStatic
+        boolean cmp(long i, long j) {
+            boolean b = i==j
+            return i!=j
+        }
+        assert cmp(1,1) == false
+        assert cmp(1,2) == true
+        '''
+        assertScript(source)
+        def bytecode = compile(method:'cmp', source)
+        assert bytecode.hasStrictSequence([
+                'LLOAD 1',
+                'LLOAD 3',
+                'LCMP',
+                'IFNE'
+        ])
     }
 }

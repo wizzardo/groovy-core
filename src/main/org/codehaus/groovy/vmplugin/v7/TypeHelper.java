@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2010 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.vmplugin.v7;
 
@@ -30,7 +33,7 @@ public class TypeHelper {
     /**
      * Get wrapper class for a given class. 
      * If the class is for a primitive number type, then the wrapper class
-     * will be returned. If it is no primtive number type, we return the 
+     * will be returned. If it is no primitive number type, we return the
      * class itself.
      */
     protected static Class getWrapperClass(Class c) {
@@ -44,11 +47,16 @@ public class TypeHelper {
             c = Double.class;
         } else if (c == Float.TYPE) {
             c = Float.class;
+        } else if (c == Boolean.TYPE) {
+            c = Boolean.class;
+        } else if (c == Character.TYPE) {
+            c = Character.class;
+        } else if (c == Short.TYPE) {
+            c = Short.class;
         }
         return c;
     }
-    
-    
+
     /**
      * Realizes an unsharp equal for the class. 
      * In general we return true if the provided arguments are the same. But
@@ -61,7 +69,7 @@ public class TypeHelper {
         if (getWrapperClass(parameterClass) == argumentClass) return true;
         return false;
     }
-    
+
     /**
      * Replaces the types in the callSiteType parameter if more specific types
      * given through the arguments. This is in general the case, unless
@@ -77,31 +85,29 @@ public class TypeHelper {
         }
         return callSiteType;
     }
-    
+
     protected static boolean isIntCategory(Class x) {
-        return  x==Integer.class    ||  x==int.class    ||
+        return x==Integer.class    ||  x==int.class    ||
                 x==Byte.class       ||  x==byte.class   ||
-                x==Character.class  ||  x==char.class   ||
                 x==Short.class      ||  x==short.class;
     }
-    
+
     protected static boolean isLongCategory(Class x) {
         return  x==Long.class       ||  x==long.class   ||
                 isIntCategory(x);
     }
-    
+
     private static boolean isBigIntCategory(Class x) {
         return  x==BigInteger.class || isLongCategory(x);
     }
-    
+
     protected static boolean isBigDecCategory(Class x) {
         return  x==BigDecimal.class || isBigIntCategory(x);
     }
-    
+
     protected static boolean isDoubleCategory(Class x) {
         return  x==Float.class      ||  x==float.class  ||
                 x==Double.class     ||  x==double.class ||
                 isBigDecCategory(x);
     }
-    
 }

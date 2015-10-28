@@ -1,17 +1,20 @@
 /*
- * Copyright 2003-2011 the original author or authors.
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.beans
 
@@ -30,12 +33,12 @@ import org.codehaus.groovy.ast.stmt.*
 
 /**
  * Handles generation of code for the {@code @ListenerList} annotation.
- * <p/>
+ * <p>
  * Generally, it adds the needed add&lt;Listener&gt;, remove&lt;Listener&gt; and
  * get&lt;Listener&gt;s methods to support the Java Beans API.
- * <p/>
+ * <p>
  * Additionally it adds corresponding fire&lt;Event&gt; methods.
- * <p/>
+ * <p>
  *
  * @author Alexander Klein
  * @author Hamlet D'Arcy
@@ -105,7 +108,6 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
 
     /**
      * Adds the add&lt;Listener&gt; method like:
-     * <p/>
      * <pre>
      * synchronized void add${name.capitalize}(${listener.name} listener) {
      *     if (listener == null)
@@ -141,7 +143,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                                 )
                         ),
                         new ReturnStatement(ConstantExpression.NULL),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 ),
                 new IfStatement(
                         new BooleanExpression(
@@ -158,7 +160,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                                         new ListExpression()
                                 )
                         ),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 ),
                 new ExpressionStatement(
                         new MethodCallExpression(new VariableExpression(field.name), new ConstantExpression('add'), new ArgumentListExpression(new VariableExpression('listener')))
@@ -169,7 +171,6 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
 
     /**
      * Adds the remove<Listener> method like:
-     * <p/>
      * <pre>
      * synchronized void remove${name.capitalize}(${listener.name} listener) {
      *     if (listener == null)
@@ -204,7 +205,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                                 )
                         ),
                         new ReturnStatement(ConstantExpression.NULL),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 ),
                 new IfStatement(
                         new BooleanExpression(
@@ -221,7 +222,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                                         new ListExpression()
                                 )
                         ),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 ),
                 new ExpressionStatement(
                         new MethodCallExpression(new VariableExpression(field.name), new ConstantExpression('remove'), new ArgumentListExpression(new VariableExpression("listener")))
@@ -232,7 +233,6 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
 
     /**
      * Adds the get&lt;Listener&gt;s method like:
-     * <p/>
      * <pre>
      * synchronized ${name.capitalize}[] get${name.capitalize}s() {
      *     def __result = []
@@ -272,7 +272,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                         new ExpressionStatement(
                                 new MethodCallExpression(new VariableExpression('__result'), new ConstantExpression('addAll'), new ArgumentListExpression(new VariableExpression(field.name)))
                         ),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 ),
                 new ReturnStatement(
                         new CastExpression(
@@ -286,7 +286,6 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
 
     /**
      * Adds the fire&lt;Event&gt; methods like:
-     * <p/>
      * <pre>
      * void fire${fireMethod.capitalize()}(${parameterList.join(', ')}) {
      *     if (${field.name} != null) {
@@ -347,7 +346,7 @@ class ListenerListASTTransformation implements ASTTransformation, Opcodes {
                                         ], new VariableScope())
                                 )
                         ], new VariableScope()),
-                        new EmptyStatement()
+                        EmptyStatement.INSTANCE
                 )
         ])
 

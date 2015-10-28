@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2007 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package groovy.time;
 
@@ -19,20 +22,19 @@ import java.util.Calendar;
 import java.util.Date;
 
 /**
- * <p>TimeDuration represents time periods expressed in units of hours, minutes, 
+ * TimeDuration represents time periods expressed in units of hours, minutes,
  * seconds and milliseconds.
- * 
+ * <p>
  * Whilst we can't say how long a month is without knowing the year and the name of the month,
- * we know how long a second is independent of the date.</p>
- * 
- * <p>This is not 100% true for minutes.
- * Minutes can be 59, 60 or 61 seconds long (due to leap seconds.)</p>
- * 
- * <p>If you ask Duration to convert itself to milliseconds then it will work on the basis of 60 seconds in a minute.
- * If you add or subtract it from a date it will take leap seconds into account.</p>
+ * we know how long a second is independent of the date.
+ * <p>
+ * This is not 100% true for minutes.
+ * Minutes can be 59, 60 or 61 seconds long (due to leap seconds.)
+ * <p>
+ * If you ask Duration to convert itself to milliseconds then it will work on the basis of 60 seconds in a minute.
+ * If you add or subtract it from a date it will take leap seconds into account.
  *
  * @author John Wilson tug@wilson.co.uk
- *
  */
 
 public class TimeDuration extends Duration {

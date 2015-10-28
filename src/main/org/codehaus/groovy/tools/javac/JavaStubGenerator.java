@@ -1,17 +1,20 @@
-/*
- * Copyright 2003-2012 the original author or authors.
+/**
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 package org.codehaus.groovy.tools.javac;
 
@@ -31,6 +34,7 @@ import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.classgen.Verifier;
 import org.codehaus.groovy.control.ResolveVisitor;
 import org.codehaus.groovy.tools.Utilities;
+import org.codehaus.groovy.transform.trait.Traits;
 import org.objectweb.asm.Opcodes;
 
 import java.io.File;
@@ -39,6 +43,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.OutputStreamWriter;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,6 +54,7 @@ import java.util.Map;
 
 public class JavaStubGenerator {
     private boolean java5 = false;
+	private String encoding;
     private boolean requireSuperResolved = false;
     private File outputPath;
     private List<String> toCompile = new ArrayList<String>();
@@ -56,15 +63,16 @@ public class JavaStubGenerator {
     private ArrayList<ConstructorNode> constructors = new ArrayList<ConstructorNode>();
     private ModuleNode currentModule;
 
-    public JavaStubGenerator(final File outputPath, final boolean requireSuperResolved, final boolean java5) {
+    public JavaStubGenerator(final File outputPath, final boolean requireSuperResolved, final boolean java5, String encoding) {
         this.outputPath = outputPath;
         this.requireSuperResolved = requireSuperResolved;
         this.java5 = java5;
+		this.encoding = encoding;
         outputPath.mkdirs();
     }
 
     public JavaStubGenerator(final File outputPath) {
-        this(outputPath, false, false);
+        this(outputPath, false, false, Charset.defaultCharset().name());
     }
 
     private void mkdirs(File parent, String relativeFile) {
@@ -93,7 +101,8 @@ public class JavaStubGenerator {
 
         File file = new File(outputPath, fileName + ".java");
         FileOutputStream fos = new FileOutputStream(file);
-        PrintWriter out = new PrintWriter(fos);
+        Charset charset = Charset.forName(encoding);
+        PrintWriter out = new PrintWriter(new OutputStreamWriter(fos, charset));
 
         try {
             String packageName = classNode.getPackageName();
@@ -125,6 +134,13 @@ public class JavaStubGenerator {
         }
         try {
             Verifier verifier = new Verifier() {
+                @Override
+                public void visitClass(final ClassNode node) {
+                    List<Statement> savedStatements = new ArrayList<Statement>(node.getObjectInitializerStatements());
+                    super.visitClass(node);
+                    node.getObjectInitializerStatements().addAll(savedStatements);
+                }
+
                 public void addCovariantMethods(ClassNode cn) {}
                 protected void addTimeStamp(ClassNode node) {}
                 protected void addInitialization(ClassNode node) {}
@@ -178,7 +194,7 @@ public class JavaStubGenerator {
             verifier.visitClass(classNode);
             currentModule = classNode.getModule();
 
-            boolean isInterface = classNode.isInterface();
+            boolean isInterface = isInterfaceOrTrait(classNode);
             boolean isEnum = (classNode.getModifiers() & Opcodes.ACC_ENUM) != 0;
             boolean isAnnotationDefinition = classNode.isAnnotationDefinition();
             printAnnotations(out, classNode);
@@ -267,6 +283,45 @@ public class JavaStubGenerator {
             }
             printMethod(out, classNode, method);
         }
+
+        for (ClassNode node : classNode.getAllInterfaces()) {
+            if (Traits.isTrait(node)) {
+                List<MethodNode> traitMethods = node.getMethods();
+                for (MethodNode traitMethod : traitMethods) {
+                    MethodNode method = classNode.getMethod(traitMethod.getName(), traitMethod.getParameters());
+                    if (method == null) {
+                        for (MethodNode methodNode : propertyMethods) {
+                            if (methodNode.getName().equals(traitMethod.getName())) {
+                                boolean sameParams = sameParameterTypes(methodNode);
+                                if (sameParams) {
+                                    method = methodNode;
+                                    break;
+                                }
+                            }
+                        }
+                        if (method==null) {
+                            printMethod(out, classNode, traitMethod);
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    private static boolean sameParameterTypes(final MethodNode methodNode) {
+        Parameter[] a = methodNode.getParameters();
+        Parameter[] b = methodNode.getParameters();
+        boolean sameParams = a.length == b.length;
+        if (sameParams) {
+            for (int i = 0; i < a.length; i++) {
+                if (!a[i].getType().equals(b[i].getType())) {
+                    sameParams = false;
+                    break;
+                }
+            }
+        }
+        return sameParams;
     }
 
     private void printConstructors(PrintWriter out, ClassNode classNode) {
@@ -281,7 +336,7 @@ public class JavaStubGenerator {
     }
 
     private void printFields(PrintWriter out, ClassNode classNode) {
-        boolean isInterface = classNode.isInterface();
+        boolean isInterface = isInterfaceOrTrait(classNode);
         List<FieldNode> fields = classNode.getFields();
         if (fields == null) return;
         List<FieldNode> enumFields = new ArrayList<FieldNode>(fields.size());
@@ -301,15 +356,16 @@ public class JavaStubGenerator {
     }
 
     private void printEnumFields(PrintWriter out, List<FieldNode> fields) {
-        if (fields.size() == 0) return;
-        boolean first = true;
-        for (FieldNode field : fields) {
-            if (!first) {
-                out.print(", ");
-            } else {
-                first = false;
+        if (fields.size() != 0) {
+            boolean first = true;
+            for (FieldNode field : fields) {
+                if (!first) {
+                    out.print(", ");
+                } else {
+                    first = false;
+                }
+                out.print(field.getName());
             }
-            out.print(field.getName());
         }
         out.println(";");
     }
@@ -338,7 +394,7 @@ public class JavaStubGenerator {
                     && valueExpr.getType().equals(fieldNode.getType())) {
                 // GROOVY-5150 : Initialize value with a dummy constant so that Java cross compiles correctly
                 if (ClassHelper.STRING_TYPE.equals(valueExpr.getType())) {
-                    out.print("\"" + escapeSpecialChars(valueExpr.getText()) + "\"");
+                    out.print(formatString(valueExpr.getText()));
                 } else if (ClassHelper.char_TYPE.equals(valueExpr.getType())) {
                     out.print("'"+valueExpr.getText()+"'");
                 } else {
@@ -357,6 +413,14 @@ public class JavaStubGenerator {
             }
         }
         out.println(";");
+    }
+
+    private String formatChar(String ch) {
+        return "'" + escapeSpecialChars("" + ch.charAt(0)) + "'";
+    }
+
+    private String formatString(String s) {
+        return "\"" + escapeSpecialChars(s) + "\"";
     }
 
     private ConstructorCallExpression getConstructorCallExpression(ConstructorNode constructorNode) {
@@ -404,14 +468,23 @@ public class JavaStubGenerator {
 
     private Parameter[] selectAccessibleConstructorFromSuper(ConstructorNode node) {
         ClassNode type = node.getDeclaringClass();
-        ClassNode superType = type.getSuperClass();
+        ClassNode superType = type.getUnresolvedSuperClass();
 
+        Parameter[] bestMatch = null;
         for (ConstructorNode c : superType.getDeclaredConstructors()) {
             // Only look at things we can actually call
-            if (c.isPublic() || c.isProtected()) {
-                return c.getParameters();
+            if (!c.isPublic() && !c.isProtected()) continue;
+            Parameter[] parameters = c.getParameters();
+            // workaround for GROOVY-5859: remove generic type info
+            Parameter[] copy = new Parameter[parameters.length];
+            for (int i = 0; i < copy.length; i++) {
+                Parameter orig = parameters[i];
+                copy[i] = new Parameter(orig.getOriginType().getPlainNodeReference(), orig.getName());
             }
+            if (noExceptionToAvoid(node,c)) return copy;
+            if (bestMatch==null) bestMatch = copy;
         }
+        if (bestMatch!=null) return bestMatch;
 
         // fall back for parameterless constructor
         if (superType.isPrimaryClassNode()) {
@@ -419,6 +492,29 @@ public class JavaStubGenerator {
         }
 
         return null;
+    }
+
+    final private static ClassNode RUNTIME_EXCEPTION = ClassHelper.make(RuntimeException.class);
+
+    private boolean noExceptionToAvoid(ConstructorNode fromStub, ConstructorNode fromSuper) {
+        ClassNode[] superExceptions = fromSuper.getExceptions();
+        if (superExceptions==null || superExceptions.length==0) return true;
+
+        ClassNode[] stubExceptions = fromStub.getExceptions();
+        if (stubExceptions==null || stubExceptions.length==0) return false;
+
+
+        // if all remaining exceptions are used in the stub we are good
+        outer: for (int i=0; i<superExceptions.length; i++) {
+            ClassNode superExc = superExceptions[i];
+            for (ClassNode stub:stubExceptions) {
+                if (stub.isDerivedFrom(superExc)) continue outer;
+            }
+            // not found 
+            return false;
+        }
+
+        return true;
     }
 
     private void printSpecialConstructorArgs(PrintWriter out, ConstructorNode node, ConstructorCallExpression constrCall) {
@@ -496,7 +592,13 @@ public class JavaStubGenerator {
         if (methodNode.isSynthetic() && methodNode.getName().equals("$getStaticMetaClass")) return;
 
         printAnnotations(out, methodNode);
-        if (!clazz.isInterface()) printModifiers(out, methodNode.getModifiers());
+        if (!isInterfaceOrTrait(clazz)) {
+            int modifiers = methodNode.getModifiers();
+            if (isDefaultTraitImpl(methodNode)) {
+                modifiers ^= Opcodes.ACC_ABSTRACT;
+            }
+            printModifiers(out, modifiers);
+        }
 
         printGenericsBounds(out, methodNode.getGenericsTypes());
         out.print(" ");
@@ -517,13 +619,86 @@ public class JavaStubGenerator {
             printType(out, exception);
         }
 
-        if ((methodNode.getModifiers() & Opcodes.ACC_ABSTRACT) != 0) {
+        if (Traits.isTrait(clazz)) {
+            out.println(";");
+        } else if (isAbstract(methodNode)) {
+            if (clazz.isAnnotationDefinition() && methodNode.hasAnnotationDefault()) {
+                Statement fs = methodNode.getFirstStatement();
+                if (fs instanceof ExpressionStatement) {
+                    ExpressionStatement es = (ExpressionStatement) fs;
+                    Expression re = es.getExpression();
+                    out.print(" default ");
+                    ClassNode rt = methodNode.getReturnType();
+                    boolean classReturn = ClassHelper.CLASS_Type.equals(rt) || (rt.isArray() && ClassHelper.CLASS_Type.equals(rt.getComponentType()));
+                    if (re instanceof ListExpression) {
+                        out.print("{ ");
+                        ListExpression le = (ListExpression) re;
+                        boolean first = true;
+                        for (Expression expression : le.getExpressions()) {
+                            if (first) first = false;
+                            else out.print(", ");
+                            printValue(out, expression, classReturn);
+                        }
+                        out.print(" }");
+                    } else {
+                        printValue(out, re, classReturn);
+                    }
+                }
+            }
             out.println(";");
         } else {
             out.print(" { ");
             ClassNode retType = methodNode.getReturnType();
             printReturn(out, retType);
             out.println("}");
+        }
+    }
+
+    private boolean isAbstract(final MethodNode methodNode) {
+        if (isDefaultTraitImpl(methodNode)) {
+            return false;
+        }
+        if ((methodNode.getModifiers() & Opcodes.ACC_ABSTRACT) != 0) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isDefaultTraitImpl(final MethodNode methodNode) {
+        return Traits.isTrait(methodNode.getDeclaringClass()) && Traits.hasDefaultImplementation(methodNode);
+    }
+
+    private void printValue(PrintWriter out, Expression re, boolean assumeClass) {
+        if (assumeClass) {
+            if (re.getType().getName().equals("groovy.lang.Closure")) {
+                out.print("groovy.lang.Closure.class");
+                return;
+            }
+            String className = re.getText();
+            out.print(className);
+            if (!className.endsWith(".class")) {
+                out.print(".class");
+            }
+        } else {
+            if (re instanceof ConstantExpression) {
+                ConstantExpression ce = (ConstantExpression) re;
+                Object value = ce.getValue();
+                if (ClassHelper.STRING_TYPE.equals(ce.getType())) {
+                    out.print(formatString((String)value));
+                } else if (ClassHelper.char_TYPE.equals(ce.getType()) || ClassHelper.Character_TYPE.equals(ce.getType())) {
+                    out.print(formatChar(value.toString()));
+                } else if (ClassHelper.long_TYPE.equals(ce.getType())) {
+                    out.print("" + value + "L");
+                } else if (ClassHelper.float_TYPE.equals(ce.getType())) {
+                    out.print("" + value + "f");
+                } else if (ClassHelper.double_TYPE.equals(ce.getType())) {
+                    out.print("" + value + "d");
+                } else {
+                    out.print(re.getText());
+                }
+            } else {
+                out.print(re.getText());
+            }
         }
     }
 
@@ -631,6 +806,7 @@ public class JavaStubGenerator {
             int lastIndex = parameters.length - 1;
             boolean vararg = parameters[lastIndex].getType().isArray();
             for (int i = 0; i != parameters.length; ++i) {
+                printAnnotations(out, parameters[i]);
                 if (i == lastIndex && vararg) {
                     printType(out, parameters[i].getType().getComponentType());
                     out.print("...");
@@ -655,13 +831,13 @@ public class JavaStubGenerator {
     }
 
     private void printAnnotation(PrintWriter out, AnnotationNode annotation) {
-        out.print("@" + annotation.getClassNode().getName() + "(");
+        out.print("@" + annotation.getClassNode().getName().replace('$', '.') + "(");
         boolean first = true;
         Map<String, Expression> members = annotation.getMembers();
         for (String key : members.keySet()) {
             if (first) first = false;
             else out.print(", ");
-            out.print(key + "=" + getAnnotationValue(members.get(key)));
+            out.print(key + "=" + getAnnotationValue(members.get(key)).replace('$', '.'));
         }
         out.print(") ");
     }
@@ -742,6 +918,14 @@ public class JavaStubGenerator {
 
         imports.addAll(Arrays.asList(ResolveVisitor.DEFAULT_IMPORTS));
 
+        for (Map.Entry<String, ImportNode> entry : moduleNode.getStaticImports().entrySet()) {
+            imports.add("static "+entry.getValue().getType().getName()+"."+entry.getKey());
+        }
+
+        for (Map.Entry<String, ImportNode> entry : moduleNode.getStaticStarImports().entrySet()) {
+            imports.add("static "+entry.getValue().getType().getName()+".");
+        }
+
         for (String imp : imports) {
             String s = new StringBuilder()
                     .append("import ")
@@ -762,5 +946,9 @@ public class JavaStubGenerator {
 
     private static String escapeSpecialChars(String value) {
         return value.replace("\n", "\\n").replace("\r", "\\r").replace("\"", "\\\"");
+    }
+
+    private static boolean isInterfaceOrTrait(ClassNode cn) {
+        return cn.isInterface() || Traits.isTrait(cn);
     }
 }
