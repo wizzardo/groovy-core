@@ -47,6 +47,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -63,6 +64,20 @@ public class InvokerHelper {
     protected static final Class[] EMPTY_TYPES = {};
 
     public static final MetaClassRegistry metaRegistry = GroovySystem.getMetaClassRegistry();
+
+    private static abstract class Formatter {
+        public void append(Appendable out, Object object) throws IOException {
+            out.append(format(object));
+        }
+
+        public void write(Writer out, Object object) throws IOException {
+            out.write(format(object));
+        }
+
+        protected abstract String format(Object object);
+    }
+
+    private static Map<Class,Formatter> formatters = new ConcurrentHashMap<Class, Formatter>();
 
     public static void removeClass(Class clazz) {
         metaRegistry.removeMetaClass(clazz);
@@ -498,72 +513,42 @@ public class InvokerHelper {
      * Writes an object to a Writer using Groovy's default representation for the object.
      */
     public static void write(Writer out, Object object) throws IOException {
-        if (object instanceof String) {
-            out.write((String) object);
-        } else if (object instanceof Object[]) {
-            out.write(toArrayString((Object[]) object));
-        } else if (object instanceof Map) {
-            out.write(toMapString((Map) object));
-        } else if (object instanceof Collection) {
-            out.write(toListString((Collection) object));
-        } else if (object instanceof Writable) {
-            Writable writable = (Writable) object;
-            writable.writeTo(out);
-        } else if (object instanceof InputStream || object instanceof Reader) {
-            // Copy stream to stream
-            Reader reader;
-            if (object instanceof InputStream) {
-                reader = new InputStreamReader((InputStream) object);
-            } else {
-                reader = (Reader) object;
-            }
-            char[] chars = new char[8192];
-            int i;
-            while ((i = reader.read(chars)) != -1) {
-                out.write(chars, 0, i);
-            }
-            reader.close();
-        } else {
-            out.write(toString(object));
+        if(object == null){
+            final NullObject nullObject = NullObject.getNullObject();
+            out.append((String) nullObject.getMetaClass().invokeMethod(nullObject, "toString", EMPTY_ARGS));
+            return;
         }
+
+        Formatter formatter = formatters.get(object.getClass());
+        if (formatter != null) {
+            formatter.write(out, object);
+            return;
+        }
+
+        formatter = createFormatter(object);
+        formatters.put(object.getClass(), formatter);
+        write(out, object);
     }
 
     /**
      * Appends an object to an Appendable using Groovy's default representation for the object.
      */
     public static void append(Appendable out, Object object) throws IOException {
-        if (object instanceof String) {
-            out.append((String) object);
-        } else if (object instanceof Object[]) {
-            out.append(toArrayString((Object[]) object));
-        } else if (object instanceof Map) {
-            out.append(toMapString((Map) object));
-        } else if (object instanceof Collection) {
-            out.append(toListString((Collection) object));
-        } else if (object instanceof Writable) {
-            Writable writable = (Writable) object;
-            StringWriter stringWriter = new StringWriter();
-            writable.writeTo(stringWriter);
-            out.append(stringWriter.toString());
-        } else if (object instanceof InputStream || object instanceof Reader) {
-            // Copy stream to stream
-            Reader reader;
-            if (object instanceof InputStream) {
-                reader = new InputStreamReader((InputStream) object);
-            } else {
-                reader = (Reader) object;
-            }
-            char[] chars = new char[8192];
-            int i;
-            while ((i = reader.read(chars)) != -1) {
-                for (int j = 0; j < i; j++) {
-                    out.append(chars[j]);
-                }
-            }
-            reader.close();
-        } else {
-            out.append(toString(object));
+        if(object == null){
+            final NullObject nullObject = NullObject.getNullObject();
+            out.append((String) nullObject.getMetaClass().invokeMethod(nullObject, "toString", EMPTY_ARGS));
+            return;
         }
+
+        Formatter formatter = formatters.get(object.getClass());
+        if (formatter != null) {
+            formatter.append(out, object);
+            return;
+        }
+
+        formatter = createFormatter(object);
+        formatters.put(object.getClass(), formatter);
+        append(out, object);
     }
 
     @SuppressWarnings("unchecked")
@@ -573,6 +558,191 @@ public class InvokerHelper {
 
     protected static String format(Object arguments, boolean verbose) {
         return format(arguments, verbose, -1);
+    }
+
+    public static Formatter createFormatter(Object object) {
+        Formatter formatter;
+        if (object instanceof String) {
+            formatter = new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return (String) object;
+                }
+            };
+        } else if (object instanceof Object[]) {
+            formatter = new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return toArrayString((Object[]) object);
+                }
+            };
+        } else if (object instanceof Map) {
+            formatter = new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return toMapString((Map) object);
+                }
+            };
+        } else if (object instanceof Collection) {
+            formatter = new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return toListString((Collection) object);
+                }
+            };
+        } else if (object instanceof Writable) {
+            formatter = new Formatter() {
+                @Override
+                public void append(Appendable out, Object object) throws IOException {
+                    Writable writable = (Writable) object;
+                    StringWriter stringWriter = new StringWriter();
+                    writable.writeTo(stringWriter);
+                    out.append(stringWriter.toString());
+                }
+
+                @Override
+                public void write(Writer out, Object object) throws IOException {
+                    Writable writable = (Writable) object;
+                    writable.writeTo(out);
+                }
+
+                protected String format(Object object) {
+                    return "";
+                }
+            };
+        } else if (object instanceof InputStream || object instanceof Reader) {
+            formatter = new Formatter() {
+                @Override
+                public void append(Appendable out, Object object) throws IOException {
+                    // Copy stream to stream
+                    Reader reader;
+                    if (object instanceof InputStream) {
+                        reader = new InputStreamReader((InputStream) object);
+                    } else {
+                        reader = (Reader) object;
+                    }
+                    char[] chars = new char[8192];
+                    int i;
+                    while ((i = reader.read(chars)) != -1) {
+                        for (int j = 0; j < i; j++) {
+                            out.append(chars[j]);
+                        }
+                    }
+                    reader.close();
+                }
+
+                @Override
+                public void write(Writer out, Object object) throws IOException {
+                    // Copy stream to stream
+                    Reader reader;
+                    if (object instanceof InputStream) {
+                        reader = new InputStreamReader((InputStream) object);
+                    } else {
+                        reader = (Reader) object;
+                    }
+                    char[] chars = new char[8192];
+                    int i;
+                    while ((i = reader.read(chars)) != -1) {
+                        out.write(chars, 0, i);
+                    }
+                    reader.close();
+                }
+
+                protected String format(Object object) {
+                    return "";
+                }
+            };
+        } else {
+            formatter = toFormatter(object);
+        }
+        return formatter;
+    }
+
+    public static Formatter toFormatter(Object arguments) {
+        if (arguments == null) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    final NullObject nullObject = NullObject.getNullObject();
+                    return (String) nullObject.getMetaClass().invokeMethod(nullObject, "toString", EMPTY_ARGS);
+                }
+            };
+        }
+        if (arguments.getClass().isArray()) {
+            if (arguments instanceof char[]) {
+                return new Formatter() {
+                    @Override
+                    protected String format(Object object) {
+                        return new String((char[]) object);
+                    }
+                };
+            }
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return formatList(DefaultTypeTransformation.asCollection(object), false, -1);
+                }
+            };
+        }
+        if (arguments instanceof Range) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return ((Range) object).toString();
+                }
+            };
+        }
+        if (arguments instanceof Collection) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return formatList((Collection) object, false, -1);
+                }
+            };
+        }
+        if (arguments instanceof Map) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return formatMap((Map) object, false, -1);
+                }
+            };
+        }
+        if (arguments instanceof Element) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    try {
+                        Method serialize = Class.forName("groovy.xml.XmlUtil").getMethod("serialize", Element.class);
+                        return  (String) serialize.invoke(null, object);
+                    } catch (ClassNotFoundException e) {
+                        throw new RuntimeException(e);
+                    } catch (NoSuchMethodException e) {
+                        throw new RuntimeException(e);
+                    } catch (InvocationTargetException e) {
+                        throw new RuntimeException(e);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            };
+        }
+        if (arguments instanceof String) {
+            return new Formatter() {
+                @Override
+                protected String format(Object object) {
+                    return (String) object;
+                }
+            };
+        }
+        // TODO: For GROOVY-2599 do we need something like below but it breaks other things
+//        return (String) invokeMethod(arguments, "toString", EMPTY_ARGS);
+        return new Formatter() {
+            @Override
+            protected String format(Object object) {
+                return object.toString();
+            }
+        };
     }
 
     public static String format(Object arguments, boolean verbose, int maxSize) {
